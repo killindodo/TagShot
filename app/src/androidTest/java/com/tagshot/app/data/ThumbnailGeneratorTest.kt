@@ -77,4 +77,32 @@ class ThumbnailGeneratorTest {
         origFile.delete()
         thumbFile.delete()
     }
+
+    @Test
+    fun testThumbnailGenerationWithRotationSwapsDimensions() {
+        val tempDir = File.createTempFile("thumb_test_rot", "").parentFile!!
+        val origFile = File(tempDir, "orig_test_rot.png")
+        val thumbFile = File(tempDir, "thumb_test_rot_512.jpg")
+
+        val bitmap = Bitmap.createBitmap(1000, 800, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.GREEN)
+        FileOutputStream(origFile).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+        bitmap.recycle()
+
+        // ORIENTATION_ROTATE_90 swaps width and height: 1000x800 becomes 800x1000
+        val success = ThumbnailGenerator.generateThumbnail(origFile, thumbFile, ExifInterface.ORIENTATION_ROTATE_90)
+        assertEquals(true, success)
+
+        val expectedDimensions = ThumbnailMath.calculate(800, 1000, 512)
+        val decodedThumb = android.graphics.BitmapFactory.decodeFile(thumbFile.absolutePath)
+
+        assertEquals(expectedDimensions.first, decodedThumb.width)
+        assertEquals(expectedDimensions.second, decodedThumb.height)
+
+        decodedThumb.recycle()
+        origFile.delete()
+        thumbFile.delete()
+    }
 }
