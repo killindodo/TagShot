@@ -1,0 +1,374 @@
+package com.tagshot.app.ui
+
+import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.tagshot.app.data.BatchImportSummary
+import com.tagshot.app.data.DeletedPhotoBackup
+import com.tagshot.app.data.PhotoRepository
+import com.tagshot.app.data.PhotoWithTags
+import com.tagshot.app.data.SingleImportResult
+import com.tagshot.app.data.TagWithCount
+import com.tagshot.app.domain.FilterPhoto
+import com.tagshot.app.domain.FilterState
+import com.tagshot.app.domain.Limits
+import com.tagshot.app.domain.ParseResult
+import com.tagshot.app.domain.PhotoFilter
+import com.tagshot.app.domain.PhotoSorter
+import com.tagshot.app.domain.SortOrder
+import com.tagshot.app.domain.SortablePhoto
+import com.tagshot.app.domain.TagParser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.io.File
+
+sealed interface MainUiState {
+    data object Loading : MainUiState
+    data class Success(
+        val photos: List<PhotoWithTags>,
+        val allTags: List<TagWithCount>,
+        val totalLibraryCount: Int,
+        val untaggedCount: Int,
+        val filterState: FilterState,
+        val sortOrder: SortOrder,
+        val isImporting: Boolean = false,
+        val importProgress: BatchImportSummary? = null
+    ) : MainUiState
+}
+
+sealed interface UiEvent {
+    data class ShowMessage(val message: String) : UiEvent
+    data class ImportFinished(val summary: BatchImportSummary) : UiEvent
+    data class ShowUndoSnackbar(val count: Int) : UiEvent
+}
+
+private data class FilterOptions(
+    val query: String,
+    val selectedTagIds: List<Long>,
+    val untaggedOnly: Boolean,
+    val sortOrderName: String
+)
+
+private data class ImportState(
+    val isImporting: Boolean,
+    val progress: BatchImportSummary?
+)
+
+class PhotoViewModel(
+    private val repository: PhotoRepository,
+    private val savedStateHandle: SavedStateHandle,
+    private val defaultDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.Default
+) : ViewModel() {
+
+
+    companion object {
+        private const val KEY_QUERY = "key_query"
+        private const val KEY_SELECTED_TAG_IDS = "key_selected_tag_ids"
+        private const val KEY_UNTAGGED_ONLY = "key_untagged_only"
+        private const val KEY_SORT_ORDER = "key_sort_order"
+    }
+
+    // Persisted state via SavedStateHandle
+    val queryFlow = savedStateHandle.getStateFlow(KEY_QUERY, "")
+    val selectedTagIdsFlow = savedStateHandle.getStateFlow<List<Long>>(KEY_SELECTED_TAG_IDS, emptyList())
+    val untaggedOnlyFlow = savedStateHandle.getStateFlow(KEY_UNTAGGED_ONLY, false)
+    val sortOrderFlow = savedStateHandle.getStateFlow(KEY_SORT_ORDER, SortOrder.NEWEST.name)
+
+    // Selection mode state
+    private val _selectedPhotoIds = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedPhotoIds: StateFlow<Set<Long>> = _selectedPhotoIds.asStateFlow()
+
+    // Import progress state
+    private val _isImporting = MutableStateFlow(false)
+    private val _importProgress = MutableStateFlow<BatchImportSummary?>(null)
+
+    // One-shot events channel
+    private val _eventChannel = Channel<UiEvent>(Channel.BUFFERED)
+    val events: Flow<UiEvent> = _eventChannel.receiveAsFlow()
+
+    // Undo delete state
+    private var pendingDeleteBackups: List<DeletedPhotoBackup>? = null
+    private var pendingDeleteJob: Job? = null
+
+    private val filterOptionsFlow: Flow<FilterOptions> = combine(
+        queryFlow,
+        selectedTagIdsFlow,
+        untaggedOnlyFlow,
+        sortOrderFlow
+    ) { query, selectedTagIds, untaggedOnly, sortOrderName ->
+        FilterOptions(query, selectedTagIds, untaggedOnly, sortOrderName)
+    }
+
+    private val importStateFlow: Flow<ImportState> = combine(
+        _isImporting,
+        _importProgress
+    ) { isImp, prog ->
+        ImportState(isImp, prog)
+    }
+
+    // Combined UI State
+    val uiState: StateFlow<MainUiState> = combine(
+        repository.observePhotos(),
+        repository.observeTags(),
+        filterOptionsFlow,
+        importStateFlow
+    ) { photos, tags, filterOpts, impState ->
+        val existingTagIds = tags.map { it.id }.toSet()
+        // Automatic removal of vanished tag IDs per Section 8.1
+        val validSelectedTagIds = filterOpts.selectedTagIds.filter { existingTagIds.contains(it) }.toSet()
+        if (validSelectedTagIds.size != filterOpts.selectedTagIds.size) {
+            savedStateHandle[KEY_SELECTED_TAG_IDS] = validSelectedTagIds.toList()
+        }
+
+        val filterState = FilterState(
+            query = filterOpts.query,
+            selectedTagIds = validSelectedTagIds,
+            untaggedOnly = filterOpts.untaggedOnly
+        )
+
+        val sortOrder = try {
+            SortOrder.valueOf(filterOpts.sortOrderName)
+        } catch (_: Exception) {
+            SortOrder.NEWEST
+        }
+
+        val totalLibraryCount = photos.size
+        val untaggedCount = photos.count { it.tags.isEmpty() }
+
+        // 1. Filter using domain PhotoFilter
+        val filtered = PhotoFilter.filter(photos, filterState) { p ->
+            FilterPhoto(
+                id = p.photo.id,
+                normalizedTags = p.tags.map { it.normalizedName }.toSet(),
+                tagIds = p.tags.map { it.id }.toSet()
+            )
+        }
+
+        // 2. Sort using domain PhotoSorter
+        val sorted = PhotoSorter.sort(filtered, sortOrder) { p ->
+            SortablePhoto(
+                id = p.photo.id,
+                addedAt = p.photo.addedAt,
+                normalizedTags = p.tags.map { it.normalizedName }.toSet()
+            )
+        }
+
+        MainUiState.Success(
+            photos = sorted,
+            allTags = tags,
+            totalLibraryCount = totalLibraryCount,
+            untaggedCount = untaggedCount,
+            filterState = filterState,
+            sortOrder = sortOrder,
+            isImporting = impState.isImporting,
+            importProgress = impState.progress
+        )
+    }.flowOn(defaultDispatcher).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = MainUiState.Loading
+    )
+
+
+    // --- Search & Filter Actions ---
+
+    fun onQueryChanged(newQuery: String) {
+        savedStateHandle[KEY_QUERY] = newQuery
+    }
+
+    fun onTagChipToggled(tagId: Long) {
+        val current = selectedTagIdsFlow.value.toMutableSet()
+        if (current.contains(tagId)) {
+            current.remove(tagId)
+        } else {
+            current.add(tagId)
+            savedStateHandle[KEY_UNTAGGED_ONLY] = false
+        }
+        savedStateHandle[KEY_SELECTED_TAG_IDS] = current.toList()
+    }
+
+    fun onUntaggedToggled() {
+        val currentUntagged = untaggedOnlyFlow.value
+        val newUntagged = !currentUntagged
+        savedStateHandle[KEY_UNTAGGED_ONLY] = newUntagged
+        if (newUntagged) {
+            savedStateHandle[KEY_SELECTED_TAG_IDS] = emptyList<Long>()
+        }
+    }
+
+    fun onClearFilters() {
+        savedStateHandle[KEY_QUERY] = ""
+        savedStateHandle[KEY_SELECTED_TAG_IDS] = emptyList<Long>()
+        savedStateHandle[KEY_UNTAGGED_ONLY] = false
+    }
+
+    fun onSortOrderSelected(order: SortOrder) {
+        savedStateHandle[KEY_SORT_ORDER] = order.name
+    }
+
+    // --- Selection Mode Actions ---
+
+    fun enterSelection(initialPhotoId: Long) {
+        _selectedPhotoIds.value = setOf(initialPhotoId)
+    }
+
+    fun toggleSelection(photoId: Long) {
+        val current = _selectedPhotoIds.value.toMutableSet()
+        if (current.contains(photoId)) {
+            current.remove(photoId)
+        } else {
+            current.add(photoId)
+        }
+        _selectedPhotoIds.value = current
+    }
+
+    fun selectAll(allPhotoIds: List<Long>) {
+        _selectedPhotoIds.value = allPhotoIds.toSet()
+    }
+
+    fun clearSelection() {
+        _selectedPhotoIds.value = emptySet()
+    }
+
+    // --- Import Actions ---
+
+    fun importPhotos(uris: List<Uri>, rawTags: String) {
+        if (uris.isEmpty()) return
+        viewModelScope.launch {
+            val tags = when (val parseResult = TagParser.parse(rawTags)) {
+                is ParseResult.Success -> parseResult.tags
+                is ParseResult.Failure.TooLong -> {
+                    _eventChannel.send(UiEvent.ShowMessage("Tag too long: ${parseResult.rawText}"))
+                    return@launch
+                }
+                is ParseResult.Failure.TooMany -> {
+                    _eventChannel.send(UiEvent.ShowMessage("Too many tags (max ${Limits.MAX_TAGS_PER_PHOTO})"))
+                    return@launch
+                }
+            }
+
+            _isImporting.value = true
+            _importProgress.value = BatchImportSummary(0, uris.size, 0, 0, 0)
+
+            val summary = repository.importUris(uris, tags) { progress ->
+                _importProgress.value = progress
+            }
+
+            _isImporting.value = false
+            _importProgress.value = null
+            _eventChannel.send(UiEvent.ImportFinished(summary))
+        }
+    }
+
+    fun importCameraPhoto(file: File, rawTags: String) {
+        viewModelScope.launch {
+            val parseResult = TagParser.parse(rawTags)
+            val tags = if (parseResult is ParseResult.Success) parseResult.tags else emptyList()
+
+            when (repository.importCameraFile(file, tags)) {
+                is SingleImportResult.Success -> {
+                    _eventChannel.send(UiEvent.ShowMessage("Photo saved"))
+                }
+                is SingleImportResult.Duplicate -> {
+                    _eventChannel.send(UiEvent.ShowMessage("Duplicate photo skipped"))
+                }
+                is SingleImportResult.Failed -> {
+                    _eventChannel.send(UiEvent.ShowMessage("Failed to save camera photo"))
+                }
+            }
+        }
+    }
+
+    // --- Tag & Note Mutations ---
+
+    fun addTagsToPhotos(photoIds: List<Long>, rawTags: String) {
+        if (photoIds.isEmpty() || rawTags.isBlank()) return
+        viewModelScope.launch {
+            when (val parseResult = TagParser.parse(rawTags)) {
+                is ParseResult.Success -> {
+                    repository.addTagsToPhotos(photoIds, parseResult.tags)
+                }
+                is ParseResult.Failure.TooLong -> {
+                    _eventChannel.send(UiEvent.ShowMessage("Tag too long: ${parseResult.rawText}"))
+                }
+                is ParseResult.Failure.TooMany -> {
+                    _eventChannel.send(UiEvent.ShowMessage("Too many tags (max ${Limits.MAX_TAGS_PER_PHOTO})"))
+                }
+            }
+        }
+    }
+
+    fun removeTagFromPhoto(photoId: Long, tagId: Long) {
+        viewModelScope.launch {
+            repository.removeTagFromPhoto(photoId, tagId)
+        }
+    }
+
+    fun updateNote(photoId: Long, note: String) {
+        val trimmed = if (note.length > Limits.MAX_NOTE_CHARS) note.take(Limits.MAX_NOTE_CHARS) else note
+        viewModelScope.launch {
+            repository.updateNote(photoId, trimmed)
+        }
+    }
+
+    fun renameTag(tagId: Long, newRaw: String) {
+        viewModelScope.launch {
+            val success = repository.renameOrMergeTag(tagId, newRaw)
+            if (!success) {
+                _eventChannel.send(UiEvent.ShowMessage("Invalid tag name"))
+            }
+        }
+    }
+
+    fun deleteTag(tagId: Long) {
+        viewModelScope.launch {
+            repository.deleteTagEverywhere(tagId)
+        }
+    }
+
+    // --- Delete & Undo Actions ---
+
+    fun deletePhotos(photoIds: List<Long>) {
+        if (photoIds.isEmpty()) return
+        clearSelection()
+        viewModelScope.launch {
+            pendingDeleteJob?.cancel()
+            pendingDeleteBackups?.let { repository.finalizeDelete(it) }
+
+            val backups = repository.prepareDelete(photoIds)
+            pendingDeleteBackups = backups
+            _eventChannel.send(UiEvent.ShowUndoSnackbar(photoIds.size))
+
+            pendingDeleteJob = launch {
+                delay(Limits.UNDO_WINDOW_MS)
+                pendingDeleteBackups?.let {
+                    repository.finalizeDelete(it)
+                    pendingDeleteBackups = null
+                }
+            }
+        }
+    }
+
+    fun undoDelete() {
+        val backups = pendingDeleteBackups ?: return
+        pendingDeleteJob?.cancel()
+        pendingDeleteBackups = null
+        viewModelScope.launch {
+            repository.restorePhotos(backups)
+            _eventChannel.send(UiEvent.ShowMessage("Delete undone"))
+        }
+    }
+}

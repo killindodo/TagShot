@@ -119,7 +119,41 @@ BUILD SUCCESSFUL in 1m 22s
 ---
 
 ## Phase 4: Repository + ViewModel
+- Status: PASSED
+- Implemented components:
+  - `DeletedPhotoBackup.kt`: Immutable backup for 8-second undo window.
+  - `PhotoRepository.kt` & `DefaultPhotoRepository`: Reactive data operations, atomic transactions, IO dispatchers.
+  - `AppContainer.kt` & `DefaultAppContainer`: Manual dependency injection container.
+  - `PhotoViewModel.kt`: Activity-scoped ViewModel with `SavedStateHandle` persistence, Flow combination, search/chip/sort/untagged filtering, selection mode, and undo timers.
+- Test Suite: 40 tests (35 domain + 5 ViewModel tests), 0 failures, 100% pass rate.
+- Gate Command:
+```bash
+./gradlew testDebugUnitTest
+```
+- Output:
+```
+> Task :app:compileDebugJavaWithJavac UP-TO-DATE
+> Task :app:bundleDebugClassesToRuntimeJar UP-TO-DATE
+> Task :app:bundleDebugClassesToCompileJar UP-TO-DATE
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:kspDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes UP-TO-DATE
+> Task :app:testDebugUnitTest
+
+BUILD SUCCESSFUL in 39s
+26 actionable tasks: 4 executed, 22 up-to-date
+```
+
+---
+
+## Phase 5: Main Screen UI
 - Status: In Progress
+
+
 
 
 
