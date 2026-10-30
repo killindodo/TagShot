@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +31,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.LabelOff
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -46,6 +48,8 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -68,6 +72,16 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -76,10 +90,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.tagshot.app.domain.SortOrder
 import com.tagshot.app.ui.components.PhotoCell
@@ -99,10 +109,17 @@ fun MainScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val isInSelectionMode = selectedPhotoIds.isNotEmpty()
+    val isInsideFolder = (uiState as? MainUiState.Success)?.let {
+        it.activeTab == MainTab.FOLDER_WISE && it.selectedFolder.isNotEmpty()
+    } == true
 
-    // Back button exits selection mode first per Section 9.1
-    BackHandler(enabled = isInSelectionMode) {
-        viewModel.clearSelection()
+    // Back button exits selection mode first per Section 9.1; if inside folder, returns to folders list
+    BackHandler(enabled = isInSelectionMode || isInsideFolder) {
+        if (isInSelectionMode) {
+            viewModel.clearSelection()
+        } else if (isInsideFolder) {
+            viewModel.onFolderSelected("")
+        }
     }
 
     // Pending camera file preserved across process death per Section 4.1
@@ -292,59 +309,130 @@ fun MainScreen(
                         )
                     }
 
-                    // In Folder Wise View, show the Folder Selector row
                     if (state.activeTab == MainTab.FOLDER_WISE) {
-                        FolderSelectorRow(
-                            allFolders = state.allFolders,
-                            selectedFolder = state.selectedFolder,
-                            onSelectFolder = { viewModel.onFolderSelected(it) },
-                            onAddNewFolderClick = { folderPickerLauncher.launch(null) }
-                        )
-                    }
-
-                    // Tag Filter Chips Row
-                    TagChipsRow(
-                        viewModel = viewModel,
-                        state = state
-                    )
-
-                    // Content Grid or Empty States
-                    if (state.activeTab == MainTab.FOLDER_WISE && state.allFolders.isEmpty()) {
-                        EmptyFolderView(onSelectFolder = { folderPickerLauncher.launch(null) })
-                    } else if (state.totalLibraryCount == 0) {
-                        EmptyLibraryView()
-                    } else if (state.photos.isEmpty()) {
-                        EmptyFilterView(onClearFilters = { viewModel.onClearFilters() })
-                    } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Adaptive(minSize = 110.dp),
-                            contentPadding = PaddingValues(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(
-                                items = state.photos,
-                                key = { it.photo.id },
-                                contentType = { "photo" }
-                            ) { item ->
-                                PhotoCell(
-                                    photoWithTags = item,
-                                    isSelected = selectedPhotoIds.contains(item.photo.id),
-                                    isInSelectionMode = isInSelectionMode,
-                                    onClick = {
-                                        if (isInSelectionMode) {
-                                            viewModel.toggleSelection(item.photo.id)
-                                        } else {
-                                            onNavigateToDetail(item.photo.id)
-                                        }
+                        if (state.selectedFolder.isEmpty()) {
+                            // Viewing all folders as cards/grid
+                            if (state.allFolders.isEmpty()) {
+                                EmptyFolderView(onSelectFolder = { folderPickerLauncher.launch(null) })
+                            } else {
+                                FolderGridView(
+                                    folders = state.allFolders,
+                                    onFolderClick = { folder ->
+                                        viewModel.onFolderSelected(folder.name)
                                     },
-                                    onLongClick = {
-                                        if (!isInSelectionMode) {
-                                            viewModel.enterSelection(item.photo.id)
-                                        }
-                                    }
+                                    onSelectNewFolder = { folderPickerLauncher.launch(null) }
                                 )
+                            }
+                        } else {
+                            // Viewing pictures inside the selected folder
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                IconButton(onClick = { viewModel.onFolderSelected("") }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to folders")
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = state.selectedFolder,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${state.photos.size} photo(s)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            // Tag Filter Chips Row for photos in this folder
+                            TagChipsRow(
+                                viewModel = viewModel,
+                                state = state
+                            )
+
+                            if (state.photos.isEmpty()) {
+                                EmptyFilterView(onClearFilters = { viewModel.onClearFilters() })
+                            } else {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Adaptive(minSize = 110.dp),
+                                    contentPadding = PaddingValues(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    items(
+                                        items = state.photos,
+                                        key = { it.photo.id },
+                                        contentType = { "photo" }
+                                    ) { item ->
+                                        PhotoCell(
+                                            photoWithTags = item,
+                                            isSelected = selectedPhotoIds.contains(item.photo.id),
+                                            isInSelectionMode = isInSelectionMode,
+                                            onClick = {
+                                                if (isInSelectionMode) {
+                                                    viewModel.toggleSelection(item.photo.id)
+                                                } else {
+                                                    onNavigateToDetail(item.photo.id)
+                                                }
+                                            },
+                                            onLongClick = {
+                                                if (!isInSelectionMode) {
+                                                    viewModel.enterSelection(item.photo.id)
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // ALL_PHOTOS Tab
+                        TagChipsRow(
+                            viewModel = viewModel,
+                            state = state
+                        )
+
+                        if (state.totalLibraryCount == 0) {
+                            EmptyLibraryView()
+                        } else if (state.photos.isEmpty()) {
+                            EmptyFilterView(onClearFilters = { viewModel.onClearFilters() })
+                        } else {
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(minSize = 110.dp),
+                                contentPadding = PaddingValues(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(
+                                    items = state.photos,
+                                    key = { it.photo.id },
+                                    contentType = { "photo" }
+                                ) { item ->
+                                    PhotoCell(
+                                        photoWithTags = item,
+                                        isSelected = selectedPhotoIds.contains(item.photo.id),
+                                        isInSelectionMode = isInSelectionMode,
+                                        onClick = {
+                                            if (isInSelectionMode) {
+                                                viewModel.toggleSelection(item.photo.id)
+                                            } else {
+                                                onNavigateToDetail(item.photo.id)
+                                            }
+                                        },
+                                        onLongClick = {
+                                            if (!isInSelectionMode) {
+                                                viewModel.enterSelection(item.photo.id)
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -680,48 +768,118 @@ private fun EmptyLibraryView() {
 }
 
 @Composable
-private fun FolderSelectorRow(
-    allFolders: List<FolderItem>,
-    selectedFolder: String,
-    onSelectFolder: (String) -> Unit,
-    onAddNewFolderClick: () -> Unit
+private fun FolderGridView(
+    folders: List<FolderItem>,
+    onFolderClick: (FolderItem) -> Unit,
+    onSelectNewFolder: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Button(
-            onClick = onAddNewFolderClick,
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Select Folder")
+            Text(
+                text = "Folders (${folders.size})",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Button(
+                onClick = onSelectNewFolder,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CreateNewFolder,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Select Folder")
+            }
         }
 
-        FilterChip(
-            selected = selectedFolder.isEmpty(),
-            onClick = { onSelectFolder("") },
-            label = { Text("All Folders") },
-            leadingIcon = if (selectedFolder.isEmpty()) {
-                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-            } else null
-        )
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 140.dp),
+            contentPadding = PaddingValues(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(
+                items = folders,
+                key = { it.name }
+            ) { folder ->
+                FolderCard(
+                    folder = folder,
+                    onClick = { onFolderClick(folder) }
+                )
+            }
+        }
+    }
+}
 
-        for (folder in allFolders) {
-            val isSelected = selectedFolder == folder.name
-            FilterChip(
-                selected = isSelected,
-                onClick = { onSelectFolder(folder.name) },
-                label = { Text("${folder.name} (${folder.photoCount})") },
-                leadingIcon = {
-                    Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp))
+@Composable
+private fun FolderCard(
+    folder: FolderItem,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val coverFile = remember(folder.coverThumbPath) {
+        folder.coverThumbPath?.let { File(context.filesDir, it) }
+    }
+
+    Card(
+        onClick = onClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (coverFile != null && coverFile.exists()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(coverFile)
+                            .crossfade(false)
+                            .build(),
+                        contentDescription = folder.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(56.dp)
+                    )
                 }
-            )
+            }
+
+            Column(modifier = Modifier.padding(10.dp)) {
+                Text(
+                    text = folder.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${folder.photoCount} photo${if (folder.photoCount == 1) "" else "s"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

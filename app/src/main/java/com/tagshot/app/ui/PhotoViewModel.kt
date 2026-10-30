@@ -42,7 +42,8 @@ enum class MainTab {
 
 data class FolderItem(
     val name: String,
-    val photoCount: Int
+    val photoCount: Int,
+    val coverThumbPath: String? = null
 )
 
 sealed interface MainUiState {
@@ -170,11 +171,16 @@ class PhotoViewModel(
         }
 
         val allFolders = photos
-            .map { it.photo.folderName }
-            .filter { it.isNotBlank() }
-            .groupingBy { it }
-            .eachCount()
-            .map { FolderItem(it.key, it.value) }
+            .filter { it.photo.folderName.isNotBlank() }
+            .groupBy { it.photo.folderName }
+            .map { (folderName, photoList) ->
+                val latestPhoto = photoList.maxByOrNull { it.photo.addedAt }
+                FolderItem(
+                    name = folderName,
+                    photoCount = photoList.size,
+                    coverThumbPath = latestPhoto?.photo?.thumbPath
+                )
+            }
             .sortedBy { it.name }
 
         val filterState = FilterState(

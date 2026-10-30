@@ -586,8 +586,10 @@ class PhotoViewModelTest {
         assertEquals(2, state.allFolders.size)
         assertEquals("Receipts", state.allFolders[0].name)
         assertEquals(2, state.allFolders[0].photoCount)
+        assertEquals("t3", state.allFolders[0].coverThumbPath)
         assertEquals("Trips", state.allFolders[1].name)
         assertEquals(1, state.allFolders[1].photoCount)
+        assertEquals("t2", state.allFolders[1].coverThumbPath)
 
         // Switch to Folder Wise View
         viewModel.onTabSelected(MainTab.FOLDER_WISE)
