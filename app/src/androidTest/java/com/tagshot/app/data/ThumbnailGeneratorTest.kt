@@ -1,8 +1,10 @@
 package com.tagshot.app.data
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.exifinterface.media.ExifInterface
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.tagshot.app.domain.ThumbnailMath
 import org.junit.Assert.assertEquals
@@ -13,6 +15,8 @@ import java.io.FileOutputStream
 
 @RunWith(AndroidJUnit4::class)
 class ThumbnailGeneratorTest {
+
+    private val context: Context get() = ApplicationProvider.getApplicationContext()
 
     @Test
     fun testExifOrientations1Through8TransformCoordinatesAccurately() {
@@ -53,7 +57,7 @@ class ThumbnailGeneratorTest {
     @Test
     fun testThumbnailGenerationDimensionsMatchThumbnailMath() {
         // Create a temporary 1000x800 image file
-        val tempDir = File.createTempFile("thumb_test", "").parentFile!!
+        val tempDir = context.cacheDir
         val origFile = File(tempDir, "orig_test_1000x800.png")
         val thumbFile = File(tempDir, "thumb_test_512.jpg")
 
@@ -80,7 +84,7 @@ class ThumbnailGeneratorTest {
 
     @Test
     fun testThumbnailGenerationWithRotationSwapsDimensions() {
-        val tempDir = File.createTempFile("thumb_test_rot", "").parentFile!!
+        val tempDir = context.cacheDir
         val origFile = File(tempDir, "orig_test_rot.png")
         val thumbFile = File(tempDir, "thumb_test_rot_512.jpg")
 

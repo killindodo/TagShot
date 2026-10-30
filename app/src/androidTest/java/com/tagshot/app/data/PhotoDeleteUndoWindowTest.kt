@@ -24,15 +24,17 @@ class PhotoDeleteUndoWindowTest {
 
     @Test
     fun testFilesAreDeletedExactlyAfter8SecondsUndoWindow() = runBlocking(Dispatchers.Default) {
-        val app = ApplicationProvider.getApplicationContext<TagShotApp>()
-        val container = app.container
-        val fileManager = container.fileManager
-        val repository = container.photoRepository
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val testBaseDir = File(context.cacheDir, "test_undo_window_1").apply { mkdirs() }
+        val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
+        val fileManager = PhotoFileManager(context, testBaseDir)
+        val importUseCase = ImportUseCase(context, fileManager, database.photoDao())
+        val repository = DefaultPhotoRepository(database.photoDao(), fileManager, importUseCase)
 
         // 1. Generate unique test ID
         val testId = java.util.UUID.randomUUID().toString()
 
-        // 2. Insert into the application's repository/DB first so orphan sweeper does not touch it
+        // 2. Insert into the isolated repository/DB
         val photoEntity = PhotoEntity(
             originalPath = "photos/orig/$testId.jpg",
             thumbPath = "photos/thumbs/$testId.jpg",
@@ -45,7 +47,7 @@ class PhotoDeleteUndoWindowTest {
             takenAt = null,
             note = ""
         )
-        val photoId = container.database.photoDao().insertPhotoWithTags(
+        val photoId = database.photoDao().insertPhotoWithTags(
             photoEntity,
             listOf(TagResult.Valid(display = "Test", normalized = "test"))
         )
@@ -57,35 +59,44 @@ class PhotoDeleteUndoWindowTest {
         assertTrue(origFile.exists())
         assertTrue(thumbFile.exists())
 
-        // 3. Create ViewModel on Main dispatcher
+        // 4. Create ViewModel on Main dispatcher
         val viewModel = kotlinx.coroutines.withContext(Dispatchers.Main) {
             PhotoViewModel(repository, SavedStateHandle())
         }
 
-        // 4. Trigger delete on Main dispatcher
+        // 5. Trigger delete on Main dispatcher
         kotlinx.coroutines.withContext(Dispatchers.Main) {
             viewModel.deletePhotos(listOf(photoId))
         }
 
-        // 5. At t = 2 seconds (during 8s undo window): files MUST still exist on disk!
-        delay(2000L)
+        // 6. At t = 2 seconds (during 8s undo window): files MUST still exist on disk!
+        kotlinx.coroutines.withContext(Dispatchers.Main) {
+            delay(2000L)
+        }
         assertTrue("Files must NOT be deleted during the 8s undo window", origFile.exists())
         assertTrue("Thumb must NOT be deleted during the 8s undo window", thumbFile.exists())
 
-        // 6. Wait until 8.5 seconds (past the 8,000ms window)
-        delay(6500L)
+        // 7. Wait until past the 8,000ms window on Main dispatcher so delay queue pumps
+        kotlinx.coroutines.withContext(Dispatchers.Main) {
+            delay(7000L)
+        }
 
-        // 7. Verify files are now permanently deleted from disk!
+        // 8. Verify files are now permanently deleted from disk!
         assertFalse("Original file must be deleted after 8 seconds", origFile.exists())
         assertFalse("Thumbnail file must be deleted after 8 seconds", thumbFile.exists())
+
+        database.close()
+        testBaseDir.deleteRecursively()
     }
 
     @Test
     fun testUndoDeleteRestoresPhotoAndTags(): Unit = runBlocking(Dispatchers.Default) {
-        val app = ApplicationProvider.getApplicationContext<TagShotApp>()
-        val container = app.container
-        val fileManager = container.fileManager
-        val repository = container.photoRepository
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val testBaseDir = File(context.cacheDir, "test_undo_window_2").apply { mkdirs() }
+        val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
+        val fileManager = PhotoFileManager(context, testBaseDir)
+        val importUseCase = ImportUseCase(context, fileManager, database.photoDao())
+        val repository = DefaultPhotoRepository(database.photoDao(), fileManager, importUseCase)
 
         val testId = java.util.UUID.randomUUID().toString()
         val photoEntity = PhotoEntity(
@@ -100,7 +111,7 @@ class PhotoDeleteUndoWindowTest {
             takenAt = null,
             note = "test note"
         )
-        val photoId = container.database.photoDao().insertPhotoWithTags(
+        val photoId = database.photoDao().insertPhotoWithTags(
             photoEntity,
             listOf(TagResult.Valid(display = "UndoTag", normalized = "undotag"))
         )
@@ -118,7 +129,7 @@ class PhotoDeleteUndoWindowTest {
 
         delay(1000L)
 
-        val photoAfterDelete = container.database.photoDao().getPhotoWithTagsById(photoId)
+        val photoAfterDelete = database.photoDao().getPhotoWithTagsById(photoId)
         assertTrue(photoAfterDelete == null)
 
         kotlinx.coroutines.withContext(Dispatchers.Main) {
@@ -127,15 +138,14 @@ class PhotoDeleteUndoWindowTest {
 
         delay(1000L)
 
-        val photoAfterUndo = container.database.photoDao().getPhotoWithTagsById(photoId)
+        val photoAfterUndo = database.photoDao().getPhotoWithTagsById(photoId)
         assertNotNull("Photo must be restored in DB", photoAfterUndo)
         assertEquals(1, photoAfterUndo!!.tags.size)
         assertEquals("undotag", photoAfterUndo.tags[0].normalizedName)
         assertEquals("test note", photoAfterUndo.photo.note)
 
         // Clean up
-        container.database.photoDao().deletePhotosAndPrune(listOf(photoId))
-        origFile.delete()
-        thumbFile.delete()
+        database.close()
+        testBaseDir.deleteRecursively()
     }
 }

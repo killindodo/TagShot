@@ -136,7 +136,7 @@ fun PhotoDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        shareSinglePhoto(context, currentPhoto.photo.originalPath)
+                        shareSinglePhoto(context, currentPhoto.photo.originalPath, currentPhoto.photo.mimeType)
                     }) {
                         Icon(Icons.Default.Share, contentDescription = "Share")
                     }
@@ -165,9 +165,13 @@ fun PhotoDetailScreen(
             ) { page ->
                 val photoItem = photos.getOrNull(page) ?: return@HorizontalPager
                 val origFile = File(context.filesDir, photoItem.photo.originalPath)
+                val thumbFile = File(context.filesDir, photoItem.photo.thumbPath)
+                val fileToView = if (origFile.exists()) origFile else thumbFile
                 ZoomableImage(
-                    imageFile = origFile,
+                    imageFile = fileToView,
                     contentDescription = "Photo ${photoItem.photo.id}",
+                    imageWidth = photoItem.photo.width,
+                    imageHeight = photoItem.photo.height,
                     onZoomChanged = { zoomed -> isZoomed = zoomed }
                 )
             }
@@ -193,7 +197,9 @@ fun PhotoDetailScreen(
             onConfirm = {
                 viewModel.deletePhotos(listOf(currentPhoto.photo.id))
                 showDeleteConfirm = false
-                safeNavigateBack()
+                if (photos.size <= 1) {
+                    safeNavigateBack()
+                }
             }
         )
     }
@@ -259,13 +265,19 @@ private fun PhotoDetailBottomSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Note Editor (max 500 chars per Section 4.3)
+        // Note Editor (max 500 chars, 600ms debounce per Section 9.2)
+        LaunchedEffect(noteText) {
+            if (noteText != photo.photo.note) {
+                kotlinx.coroutines.delay(600)
+                onNoteChanged(noteText)
+            }
+        }
+
         OutlinedTextField(
             value = noteText,
             onValueChange = {
                 if (it.length <= Limits.MAX_NOTE_CHARS) {
                     noteText = it
-                    onNoteChanged(it)
                 }
             },
             label = { Text("Note (${noteText.length}/${Limits.MAX_NOTE_CHARS})") },
@@ -298,14 +310,16 @@ private fun formatFileSize(bytes: Long): String {
     return "%.2f MB".format(mb)
 }
 
-private fun shareSinglePhoto(context: Context, relativePath: String) {
+private fun shareSinglePhoto(context: Context, relativePath: String, mimeType: String = "image/*") {
     val file = File(context.filesDir, relativePath)
     if (!file.exists()) return
     val authority = "${context.packageName}.fileprovider"
     val uri = FileProvider.getUriForFile(context, authority, file)
 
+    val finalMime = mimeType.ifBlank { "image/*" }
     val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "image/*"
+        type = finalMime
+        clipData = android.content.ClipData.newUri(context.contentResolver, "Photo", uri)
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }

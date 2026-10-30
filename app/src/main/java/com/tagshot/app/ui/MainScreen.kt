@@ -217,7 +217,7 @@ fun MainScreen(
                             cameraLauncher.launch(uri)
                         } catch (e: ActivityNotFoundException) {
                             pendingCameraFileName = null
-                            viewModel.events
+                            viewModel.showMessage("No camera application available")
                         }
                     },
                     onGalleryClick = {
@@ -622,12 +622,18 @@ private fun sharePhotos(context: android.content.Context, relativePaths: List<St
     val intent = if (uris.size == 1) {
         Intent(Intent.ACTION_SEND).apply {
             type = "image/*"
+            clipData = android.content.ClipData.newUri(context.contentResolver, "Photo", uris[0])
             putExtra(Intent.EXTRA_STREAM, uris[0])
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     } else {
+        val clipData = android.content.ClipData.newUri(context.contentResolver, "Photo", uris[0])
+        for (i in 1 until uris.size) {
+            clipData.addItem(android.content.ClipData.Item(uris[i]))
+        }
         Intent(Intent.ACTION_SEND_MULTIPLE).apply {
             type = "image/*"
+            this.clipData = clipData
             putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }

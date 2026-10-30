@@ -48,28 +48,20 @@ class ImportUseCase(
         uri: Uri,
         tags: List<TagResult.Valid> = emptyList()
     ): SingleImportResult = withContext(Dispatchers.IO) {
-        // Step 1 per Section 7: Open stream via ContentResolver. Null stream -> Failed(Unreadable)
+        val uuid = UUID.randomUUID().toString()
+        val tempOrigFile = File(fileManager.origDir, "$uuid.tmp")
+
+        // Step 1: Open stream via ContentResolver once. Null stream -> Failed(Unreadable)
         val initialStream: InputStream = try {
             contentResolver.openInputStream(uri)
         } catch (_: Exception) {
             null
         } ?: return@withContext SingleImportResult.Failed.Unreadable
 
-        // Step 2 per Section 7: Pick extension. Unknown -> Failed(Unsupported)
-        val extension = resolveExtension(uri) ?: run {
-            try { initialStream.close() } catch (_: Exception) {}
-            return@withContext SingleImportResult.Failed.Unsupported
-        }
-
-        val uuid = UUID.randomUUID().toString()
-        val origFile = File(fileManager.origDir, "$uuid.$extension")
-        val tempOrigFile = File(fileManager.origDir, "$uuid.tmp")
-        val thumbFile = File(fileManager.thumbDir, "$uuid.jpg")
-
         val sha256Hex: String
         var sizeBytes = 0L
 
-        // Step 3 per Section 7: Stream-copy while hashing
+        // Step 2: Stream-copy to temp file while calculating SHA-256 and byte count in a single pass
         try {
             val digest = MessageDigest.getInstance("SHA-256")
             DigestInputStream(initialStream, digest).use { dis ->
@@ -83,27 +75,63 @@ class ImportUseCase(
                     fos.fd.sync()
                 }
             }
-
             sha256Hex = digest.digest().joinToString("") { "%02x".format(it) }
-
-            if (!tempOrigFile.renameTo(origFile)) {
-                tempOrigFile.delete()
-                return@withContext SingleImportResult.Failed.Error("Atomic rename failed")
-            }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             tempOrigFile.delete()
-            origFile.delete()
             return@withContext SingleImportResult.Failed.Unreadable
         }
 
-        // Step 4 per Section 7: Check duplicate SHA in DB
-        val existing = photoDao.getPhotoBySha256(sha256Hex)
-        if (existing != null) {
-            origFile.delete()
-            return@withContext SingleImportResult.Duplicate
+        if (sizeBytes <= 0L) {
+            tempOrigFile.delete()
+            return@withContext SingleImportResult.Failed.Unreadable
         }
 
-        // Step 5 per Section 7: Read EXIF orientation and DateTimeOriginal
+        // Step 3: Check duplicate SHA in DB
+        val existing = photoDao.getPhotoBySha256(sha256Hex)
+        if (existing != null) {
+            val existingOrig = fileManager.resolve(existing.originalPath)
+            val existingThumb = fileManager.resolve(existing.thumbPath)
+            if (existingOrig.exists() && existingThumb.exists()) {
+                tempOrigFile.delete()
+                return@withContext SingleImportResult.Duplicate
+            } else {
+                // Dead/ghost DB row whose files were deleted on disk: prune it so re-import succeeds
+                photoDao.deletePhotosAndPrune(listOf(existing.id))
+            }
+        }
+
+        // Step 4: Decode bounds and verify the file is a valid, readable image
+        val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(tempOrigFile.absolutePath, boundsOptions)
+        val rawW = boundsOptions.outWidth
+        val rawH = boundsOptions.outHeight
+
+        if (rawW <= 0 || rawH <= 0) {
+            tempOrigFile.delete()
+            return@withContext SingleImportResult.Failed.Unsupported
+        }
+
+        // Determine extension and MIME type directly from bounds, content resolver, or URI path
+        val crMime = try { contentResolver.getType(uri)?.lowercase(Locale.ROOT) } catch (_: Exception) { null }
+        val extension = resolveExtensionFromMime(crMime)
+            ?: resolveExtensionFromMime(boundsOptions.outMimeType)
+            ?: resolveExtensionFromUri(uri)
+            ?: "jpg"
+
+        val mimeType = boundsOptions.outMimeType
+            ?: crMime
+            ?: resolveMimeType(extension)
+
+        val origFile = File(fileManager.origDir, "$uuid.$extension")
+        val thumbFile = File(fileManager.thumbDir, "$uuid.jpg")
+
+        // Atomic rename from .tmp to final extension
+        if (!tempOrigFile.renameTo(origFile)) {
+            tempOrigFile.delete()
+            return@withContext SingleImportResult.Failed.Error("Atomic rename failed")
+        }
+
+        // Step 5: Read EXIF orientation and DateTimeOriginal
         var orientation = ExifInterface.ORIENTATION_NORMAL
         var takenAt: Long? = null
         try {
@@ -119,18 +147,6 @@ class ImportUseCase(
             // EXIF errors are never fatal
         }
 
-        // Step 6 per Section 7: Decode bounds
-        val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(origFile.absolutePath, boundsOptions)
-        val rawW = boundsOptions.outWidth
-        val rawH = boundsOptions.outHeight
-        val mimeType = boundsOptions.outMimeType ?: resolveMimeType(extension)
-
-        if (rawW <= 0 || rawH <= 0) {
-            origFile.delete()
-            return@withContext SingleImportResult.Failed.Unsupported
-        }
-
         val isSwapped = orientation in listOf(
             ExifInterface.ORIENTATION_TRANSPOSE,
             ExifInterface.ORIENTATION_ROTATE_90,
@@ -140,7 +156,7 @@ class ImportUseCase(
         val orientedW = if (isSwapped) rawH else rawW
         val orientedH = if (isSwapped) rawW else rawH
 
-        // Generate thumbnail
+        // Step 6: Generate thumbnail
         try {
             val thumbSuccess = ThumbnailGenerator.generateThumbnail(origFile, thumbFile, orientation)
             if (!thumbSuccess) {
@@ -152,9 +168,13 @@ class ImportUseCase(
             origFile.delete()
             thumbFile.delete()
             return@withContext SingleImportResult.Failed.OutOfMemory
+        } catch (e: Exception) {
+            origFile.delete()
+            thumbFile.delete()
+            return@withContext SingleImportResult.Failed.Error(e.message ?: "Thumbnail generation failed")
         }
 
-        // Step 7 per Section 7: DB insert with compensation
+        // Step 7: DB insert with compensation
         val relativeOrig = "photos/orig/${origFile.name}"
         val relativeThumb = "photos/thumbs/${thumbFile.name}"
 
@@ -175,7 +195,7 @@ class ImportUseCase(
             val photoId = photoDao.insertPhotoWithTags(photoEntity, tags)
             SingleImportResult.Success(photoId)
         } catch (e: Exception) {
-            // Compensate
+            // Compensate on DB failure
             origFile.delete()
             thumbFile.delete()
             SingleImportResult.Failed.Error(e.message ?: "Database insert failed")
@@ -193,7 +213,12 @@ class ImportUseCase(
         val total = uris.size
 
         for ((index, uri) in uris.withIndex()) {
-            when (importSingle(uri, tags)) {
+            val result = try {
+                importSingle(uri, tags)
+            } catch (e: Exception) {
+                SingleImportResult.Failed.Error(e.message ?: "Import failed")
+            }
+            when (result) {
                 is SingleImportResult.Success -> imported++
                 is SingleImportResult.Duplicate -> duplicates++
                 is SingleImportResult.Failed -> failed++
@@ -218,42 +243,24 @@ class ImportUseCase(
         )
     }
 
-    private fun resolveExtension(uri: Uri): String? {
-        val mime = contentResolver.getType(uri)?.lowercase(Locale.ROOT)
-        if (mime != null) {
-            when (mime) {
-                "image/jpeg", "image/jpg" -> return "jpg"
-                "image/png" -> return "png"
-                "image/webp" -> return "webp"
-                "image/heic" -> return "heic"
-                "image/heif" -> return "heif"
-                "image/gif" -> return "gif"
-            }
+    private fun resolveExtensionFromMime(mime: String?): String? {
+        return when (mime?.lowercase(Locale.ROOT)) {
+            "image/jpeg", "image/jpg" -> "jpg"
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            "image/heic" -> "heic"
+            "image/heif" -> "heif"
+            "image/gif" -> "gif"
+            else -> null
         }
+    }
 
-        // Check path extension
+    private fun resolveExtensionFromUri(uri: Uri): String? {
         val path = uri.path ?: uri.toString()
         val dotExt = path.substringAfterLast('.', "").lowercase(Locale.ROOT)
-        if (dotExt in listOf("jpg", "jpeg", "png", "webp", "heic", "heif", "gif")) {
-            return if (dotExt == "jpeg") "jpg" else dotExt
-        }
-
-        // Try decoding bounds mime
-        return try {
-            contentResolver.openInputStream(uri)?.use { stream ->
-                val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeStream(stream, null, options)
-                when (options.outMimeType?.lowercase(Locale.ROOT)) {
-                    "image/jpeg", "image/jpg" -> "jpg"
-                    "image/png" -> "png"
-                    "image/webp" -> "webp"
-                    "image/gif" -> "gif"
-                    else -> null
-                }
-            }
-        } catch (_: Exception) {
-            null
-        }
+        return if (dotExt in listOf("jpg", "jpeg", "png", "webp", "heic", "heif", "gif")) {
+            if (dotExt == "jpeg") "jpg" else dotExt
+        } else null
     }
 
     private fun resolveMimeType(extension: String): String {

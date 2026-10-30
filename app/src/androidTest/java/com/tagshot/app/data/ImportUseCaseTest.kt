@@ -29,14 +29,16 @@ class ImportUseCaseTest {
     private lateinit var orphanSweeper: OrphanSweeper
 
     private val tempFilesToClean = mutableListOf<File>()
+    private lateinit var testBaseDir: File
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
+        testBaseDir = File(context.cacheDir, "test_photos").apply { mkdirs() }
         database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        fileManager = PhotoFileManager(context)
+        fileManager = PhotoFileManager(context, testBaseDir)
         importUseCase = ImportUseCase(context, fileManager, database.photoDao())
         orphanSweeper = OrphanSweeper(fileManager, database.photoDao())
     }
@@ -45,8 +47,7 @@ class ImportUseCaseTest {
     fun tearDown() {
         database.close()
         tempFilesToClean.forEach { it.delete() }
-        fileManager.origDir.listFiles()?.forEach { it.delete() }
-        fileManager.thumbDir.listFiles()?.forEach { it.delete() }
+        testBaseDir.deleteRecursively()
         fileManager.cameraDir.listFiles()?.forEach { it.delete() }
     }
 
@@ -147,5 +148,51 @@ class ImportUseCaseTest {
         val thumbFiles = fileManager.thumbDir.listFiles() ?: emptyArray()
         assertEquals("Orig dir must be empty after compensation", 0, origFiles.size)
         assertEquals("Thumb dir must be empty after compensation", 0, thumbFiles.size)
+    }
+
+    @Test
+    fun testImportPhotoWithNoExtensionInUri() = runBlocking {
+        val fileNoExt = File(context.cacheDir, "sample_no_extension_12345")
+        val bitmap = Bitmap.createBitmap(150, 150, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.BLUE)
+        FileOutputStream(fileNoExt).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+        bitmap.recycle()
+        tempFilesToClean.add(fileNoExt)
+
+        val uri = Uri.fromFile(fileNoExt)
+        val result = importUseCase.importSingle(uri)
+        assertTrue("Import must succeed even if URI has no extension", result is SingleImportResult.Success)
+        val photoId = (result as SingleImportResult.Success).photoId
+        val photoInDb = database.photoDao().getPhotoWithTagsById(photoId)
+        assertNotNull(photoInDb)
+        assertTrue("Original file must exist", fileManager.resolve(photoInDb!!.photo.originalPath).exists())
+        assertTrue("Thumb file must exist", fileManager.resolve(photoInDb.photo.thumbPath).exists())
+    }
+
+    @Test
+    fun testGhostDbRowPrunedOnReimport() = runBlocking {
+        val testFile = createSampleImageFile("test_sample_ghost", Color.MAGENTA)
+        val uri = Uri.fromFile(testFile)
+
+        // Initial import
+        val result1 = importUseCase.importSingle(uri)
+        assertTrue("Initial import failed with: $result1", result1 is SingleImportResult.Success)
+        val photoId = (result1 as SingleImportResult.Success).photoId
+        val photo1 = database.photoDao().getPhotoWithTagsById(photoId)!!
+
+        // Simulate ghost row: delete files from disk but leave DB row
+        fileManager.resolve(photo1.photo.originalPath).delete()
+        fileManager.resolve(photo1.photo.thumbPath).delete()
+
+        // Re-importing should detect files are missing on disk, prune ghost row, and succeed
+        val result2 = importUseCase.importSingle(uri)
+        assertTrue("Re-importing when files are missing on disk must succeed", result2 is SingleImportResult.Success)
+        val newPhotoId = (result2 as SingleImportResult.Success).photoId
+        val newPhoto = database.photoDao().getPhotoWithTagsById(newPhotoId)
+        assertNotNull(newPhoto)
+        assertTrue("New original file must exist", fileManager.resolve(newPhoto!!.photo.originalPath).exists())
+        assertTrue("New thumb file must exist", fileManager.resolve(newPhoto.photo.thumbPath).exists())
     }
 }

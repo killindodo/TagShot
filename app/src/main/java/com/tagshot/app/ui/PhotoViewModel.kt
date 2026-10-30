@@ -99,6 +99,12 @@ class PhotoViewModel(
     private val _eventChannel = Channel<UiEvent>(Channel.BUFFERED)
     val events: Flow<UiEvent> = _eventChannel.receiveAsFlow()
 
+    fun showMessage(message: String) {
+        viewModelScope.launch {
+            _eventChannel.send(UiEvent.ShowMessage(message))
+        }
+    }
+
     // Undo delete state
     private var pendingDeleteBackups: List<DeletedPhotoBackup>? = null
     private var pendingDeleteJob: Job? = null

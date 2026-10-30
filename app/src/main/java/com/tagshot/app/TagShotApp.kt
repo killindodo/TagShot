@@ -16,12 +16,18 @@ class TagShotApp : Application() {
         super.onCreate()
         container = DefaultAppContainer(this)
 
-        // Run orphan sweeper once at app start per Section 7 & 8
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                container.orphanSweeper.sweep()
-            } catch (_: Exception) {
-                // Ignore sweep errors at startup
+        // Run orphan sweeper once at app start per Section 7 & 8 (skip in instrumentation test environment)
+        val isInstrumentationTest = runCatching {
+            Class.forName("androidx.test.runner.AndroidJUnitRunner")
+        }.isSuccess
+
+        if (!isInstrumentationTest) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    container.orphanSweeper.sweep()
+                } catch (_: Exception) {
+                    // Ignore sweep errors at startup
+                }
             }
         }
     }
