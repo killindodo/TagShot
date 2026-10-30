@@ -82,8 +82,16 @@ fun PhotoDetailScreen(
     val successState = uiState as? MainUiState.Success
     val photos = successState?.photos ?: emptyList()
 
+    var isNavigatingBack by remember { mutableStateOf(false) }
+    val safeNavigateBack: () -> Unit = {
+        if (!isNavigatingBack) {
+            isNavigatingBack = true
+            onNavigateBack()
+        }
+    }
+
     if (photos.isEmpty()) {
-        LaunchedEffect(Unit) { onNavigateBack() }
+        LaunchedEffect(Unit) { safeNavigateBack() }
         return
     }
 
@@ -98,7 +106,8 @@ fun PhotoDetailScreen(
     var showAddTagDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    val currentPhoto = photos.getOrNull(pagerState.currentPage) ?: photos[0]
+    val safePage = pagerState.currentPage.coerceIn(0, (photos.size - 1).coerceAtLeast(0))
+    val currentPhoto = photos.getOrNull(safePage) ?: return
 
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(
@@ -119,9 +128,9 @@ fun PhotoDetailScreen(
         },
         topBar = {
             TopAppBar(
-                title = { Text(text = "${pagerState.currentPage + 1} of ${photos.size}") },
+                title = { Text(text = "${safePage + 1} of ${photos.size}") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = safeNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -149,12 +158,12 @@ fun PhotoDetailScreen(
         ) {
             HorizontalPager(
                 state = pagerState,
-                key = { photos[it].photo.id },
+                key = { page -> photos.getOrNull(page)?.photo?.id ?: page.toLong() },
                 userScrollEnabled = !isZoomed,
                 beyondBoundsPageCount = 1,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
-                val photoItem = photos[page]
+                val photoItem = photos.getOrNull(page) ?: return@HorizontalPager
                 val origFile = File(context.filesDir, photoItem.photo.originalPath)
                 ZoomableImage(
                     imageFile = origFile,
@@ -184,7 +193,7 @@ fun PhotoDetailScreen(
             onConfirm = {
                 viewModel.deletePhotos(listOf(currentPhoto.photo.id))
                 showDeleteConfirm = false
-                onNavigateBack()
+                safeNavigateBack()
             }
         )
     }

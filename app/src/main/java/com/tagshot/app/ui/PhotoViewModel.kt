@@ -130,7 +130,9 @@ class PhotoViewModel(
         // Automatic removal of vanished tag IDs per Section 8.1
         val validSelectedTagIds = filterOpts.selectedTagIds.filter { existingTagIds.contains(it) }.toSet()
         if (validSelectedTagIds.size != filterOpts.selectedTagIds.size) {
-            savedStateHandle[KEY_SELECTED_TAG_IDS] = validSelectedTagIds.toList()
+            viewModelScope.launch(Dispatchers.Main.immediate) {
+                savedStateHandle[KEY_SELECTED_TAG_IDS] = validSelectedTagIds.toList()
+            }
         }
 
         val filterState = FilterState(

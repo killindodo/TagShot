@@ -75,7 +75,9 @@ class MainActivity : ComponentActivity() {
                                 initialPhotoId = photoId,
                                 viewModel = viewModel,
                                 onNavigateBack = {
-                                    navController.popBackStack()
+                                    if (navController.currentDestination?.route?.startsWith("detail") == true) {
+                                        navController.popBackStack("main", inclusive = false)
+                                    }
                                 }
                             )
                         }
@@ -84,7 +86,9 @@ class MainActivity : ComponentActivity() {
                             TagManagerScreen(
                                 viewModel = viewModel,
                                 onNavigateBack = {
-                                    navController.popBackStack()
+                                    if (navController.currentDestination?.route == "tag_manager") {
+                                        navController.popBackStack("main", inclusive = false)
+                                    }
                                 }
                             )
                         }

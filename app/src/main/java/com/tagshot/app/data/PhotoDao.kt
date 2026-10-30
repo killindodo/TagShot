@@ -44,6 +44,9 @@ interface PhotoDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertPhoto(photo: PhotoEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun restorePhoto(photo: PhotoEntity): Long
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTag(tag: TagEntity): Long
 
@@ -115,10 +118,11 @@ interface PhotoDao {
      */
     @Transaction
     suspend fun restorePhotoWithTags(photo: PhotoEntity, tagList: List<TagEntity>) {
-        insertPhoto(photo)
+        val restoredId = restorePhoto(photo)
+        val targetPhotoId = if (photo.id > 0) photo.id else restoredId
         for (tag in tagList) {
             val tagId = upsertTag(tag.name, tag.normalizedName)
-            insertCrossRef(PhotoTagCrossRef(photoId = photo.id, tagId = tagId))
+            insertCrossRef(PhotoTagCrossRef(photoId = targetPhotoId, tagId = tagId))
         }
     }
 
