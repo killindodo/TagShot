@@ -91,7 +91,37 @@ BUILD SUCCESSFUL in 2m 37s
 ---
 
 ## Phase 3: File Pipeline + Import
+- Status: PASSED
+- Implemented components:
+  - `ThumbnailGenerator.kt`: EXIF orientations 1..8 matrix transformations, downsampling, and JPEG compression.
+  - `PhotoFileManager.kt`: App-private storage paths (`photos/orig/`, `photos/thumbs/`, `cache/camera/`).
+  - `OrphanSweeper.kt`: Cleanup of unreferenced files and camera cache.
+  - `ImportUseCase.kt`: Sequential import, SHA-256 deduplication, EXIF extraction, and compensation on failure.
+- Tests in `src/androidTest`:
+  - `ThumbnailGeneratorTest.kt`: 2 tests (matrix orientation pixel verification + dimensions).
+  - `ImportUseCaseTest.kt`: 3 tests (import & duplicate skip + unreadable stream + orphan sweeper).
+- Gate Command:
+```bash
+./gradlew connectedDebugAndroidTest
+```
+- Output:
+```
+> Task :app:connectedDebugAndroidTest
+Starting 12 tests on I2221 - 16
+
+Finished 12 tests on I2221 - 16
+
+BUILD SUCCESSFUL in 1m 22s
+66 actionable tasks: 10 executed, 56 up-to-date
+```
+- Total instrumentation tests: 12 passed, 0 failed, 0 skipped.
+
+---
+
+## Phase 4: Repository + ViewModel
 - Status: In Progress
+
+
 
 
 
