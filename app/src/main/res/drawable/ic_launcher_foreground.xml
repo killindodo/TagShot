@@ -3,7 +3,23 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Photo Frame -->
     <path
-        android:fillColor="#3DDC84"
-        android:pathData="M30,30h48v48h-48z" />
+        android:fillColor="#334155"
+        android:pathData="M28,34h52v42h-52z" />
+    <path
+        android:fillColor="#64748B"
+        android:pathData="M32,72 L48,54 L58,64 L66,56 L76,68 L76,72 L32,72 Z" />
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M66,44a4,4 0 1,0 0.01,0z" />
+
+    <!-- Tag Badge Overlay -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M48,22 L68,22 L82,36 L68,50 L48,50 Z" />
+    <!-- Tag Hole -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M54,36a3,3 0 1,0 0.01,0z" />
 </vector>

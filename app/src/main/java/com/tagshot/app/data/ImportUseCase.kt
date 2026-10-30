@@ -66,7 +66,7 @@ class ImportUseCase(
         val tempOrigFile = File(fileManager.origDir, "$uuid.tmp")
         val thumbFile = File(fileManager.thumbDir, "$uuid.jpg")
 
-        var sha256Hex = ""
+        val sha256Hex: String
         var sizeBytes = 0L
 
         // Step 3 per Section 7: Stream-copy while hashing

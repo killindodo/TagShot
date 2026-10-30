@@ -151,7 +151,62 @@ BUILD SUCCESSFUL in 39s
 ---
 
 ## Phase 5: Main Screen UI
-- Status: In Progress
+- Status: PASSED
+- Implemented components:
+  - `MainScreen.kt`: Search bar (instant substring & tag match), sort dropdown menu, dynamic filter chip row ("All", "Untagged", and individual `#tag (count)` chips), adaptive grid (`GridCells.Adaptive(110.dp)`), Coil `AsyncImage` with `size(512)` fixed requests, expandable FAB (Camera & Gallery).
+  - `TagInputDialog`: Live parsing preview, suggestion chips from existing tags, validation against Limits.
+  - Camera & Gallery import flows: `ActivityResultContracts.TakePicture()` and `PickMultipleVisualMedia()`, pending camera state preserved via `rememberSaveable`.
+- Gate Command:
+```bash
+./gradlew assembleDebug
+```
+- Output:
+```
+BUILD SUCCESSFUL in 1m 1s
+37 actionable tasks: 8 executed, 29 up-to-date
+```
+
+---
+
+## Phase 6: Detail + Zoom + Share
+- Status: PASSED
+- Implemented components:
+  - `PhotoDetailScreen.kt`: `HorizontalPager` with `beyondBoundsPageCount = 1`, `userScrollEnabled` bound to `!isZoomed`.
+  - `ZoomableImage.kt`: Focal invariant pinch-to-zoom (1× to 8×), pan, and double-tap toggle (1× ↔ 3×) using `ZoomMath`. Detail images capped by `Limits.DETAIL_MAX_EDGE` (3072 px).
+  - Bottom info sheet: Formatted import and capture timestamps, dimensions, file size, editable note (debounced save up to 500 chars), tag flow row with direct tag removal and addition.
+  - Sharing: Single and multiple photo sharing via `FileProvider` (`${applicationId}.fileprovider`) with read URI permissions.
+- Gate: Tested and verified compilation with unit and connected tests.
+
+---
+
+## Phase 7: Bulk Mode, Undo, Tag Manager, Accessibility, Theming
+- Status: PASSED
+- Implemented components:
+  - Bulk Selection Mode: Long-press on cells enters selection; multi-select top bar with "N selected", Add Tags, Remove Tag (shows dialog with distinct tags on selection), Share Selected, Delete Selected. Back exits selection first.
+  - 8-Second Undo Window: `UiEvent.ShowUndoSnackbar` with action "Undo" triggers `repository.restorePhotos(backups)`. File deletion deferred until window closes.
+  - `TagManagerScreen.kt`: Lists all tags with photo counts; Rename dialog with automatic merge detection if target normalized tag already exists; Delete dialog ("Remove #x from N photos? Photos are not deleted").
+  - Theming & Edge-to-Edge: `TagShotTheme` with dynamic color for Android 12+ (API 31+) and fallback light/dark schemes; `enableEdgeToEdge()` enabled in `MainActivity.kt`.
+  - Adaptive Launcher Icon: Vector adaptive icon (`ic_launcher_foreground.xml`) featuring tag badge over photo frame.
+  - Accessibility: Touch targets ≥ 48 dp, `contentDescription` on all interactive icons.
+- Verification Gates:
+```bash
+./gradlew testDebugUnitTest
+```
+- Output:
+```
+BUILD SUCCESSFUL in 2m 11s
+26 actionable tasks: 14 executed, 12 up-to-date
+```
+```bash
+./gradlew connectedDebugAndroidTest
+```
+- Output:
+```
+Starting 12 tests on I2221 - 16
+Finished 12 tests on I2221 - 16
+BUILD SUCCESSFUL in 58s
+66 actionable tasks: 7 executed, 59 up-to-date
+```
 
 
 

@@ -317,6 +317,14 @@ class PhotoViewModel(
         }
     }
 
+    fun removeTagFromPhotos(photoIds: List<Long>, tagId: Long) {
+        viewModelScope.launch {
+            for (id in photoIds) {
+                repository.removeTagFromPhoto(id, tagId)
+            }
+        }
+    }
+
     fun updateNote(photoId: Long, note: String) {
         val trimmed = if (note.length > Limits.MAX_NOTE_CHARS) note.take(Limits.MAX_NOTE_CHARS) else note
         viewModelScope.launch {
