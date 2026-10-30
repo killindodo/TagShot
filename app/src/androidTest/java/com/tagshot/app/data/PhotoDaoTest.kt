@@ -2,6 +2,7 @@ package com.tagshot.app.data
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.tagshot.app.domain.TagResult
@@ -209,5 +210,28 @@ class PhotoDaoTest {
         val p2Tags = photoDao.getPhotoWithTagsById(id2)!!.tags
         assertEquals(1, p2Tags.size)
         assertEquals("receipt", p2Tags[0].normalizedName)
+    }
+
+    @Test
+    fun testWholeMutationRollsBackWhenSecondStatementFails() = runBlocking {
+        val initialPhotoCount = photoDao.getAllPhotos().size
+        val photo = createPhoto("sha-rollback-test")
+        var caughtException = false
+
+        try {
+            database.withTransaction<Unit> {
+                photoDao.insertPhoto(photo)
+                // Second statement fails
+                if (photo.sha256.isNotEmpty()) {
+                    throw IllegalStateException("Simulated failure in transaction")
+                }
+            }
+        } catch (_: IllegalStateException) {
+            caughtException = true
+        }
+
+        assertTrue("Expected IllegalStateException from transaction", caughtException)
+        val photosAfter = photoDao.getAllPhotos()
+        assertEquals("Photo insert must roll back when subsequent statement fails", initialPhotoCount, photosAfter.size)
     }
 }

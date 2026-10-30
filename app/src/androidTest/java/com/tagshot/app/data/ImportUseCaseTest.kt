@@ -124,4 +124,28 @@ class ImportUseCaseTest {
         assertTrue("Referenced orig must remain", fileManager.resolve(dbPhoto.originalPath).exists())
         assertTrue("Referenced thumb must remain", fileManager.resolve(dbPhoto.thumbPath).exists())
     }
+
+    @Test
+    fun testDatabaseFailureCompensatesAndCleansUpFiles() = runBlocking {
+        val realDao = database.photoDao()
+        val failingDao = object : PhotoDao by realDao {
+            override suspend fun insertPhotoWithTags(
+                photo: PhotoEntity,
+                tags: List<TagResult.Valid>
+            ): Long {
+                throw java.sql.SQLException("Simulated database failure during insert")
+            }
+        }
+        val failingImportUseCase = ImportUseCase(context, fileManager, failingDao)
+        val sampleFile = createSampleImageFile("test_sample_db_fail")
+        val uri = Uri.fromFile(sampleFile)
+
+        val result = failingImportUseCase.importSingle(uri)
+        assertTrue("Must report Error on DB failure", result is SingleImportResult.Failed.Error)
+
+        val origFiles = fileManager.origDir.listFiles() ?: emptyArray()
+        val thumbFiles = fileManager.thumbDir.listFiles() ?: emptyArray()
+        assertEquals("Orig dir must be empty after compensation", 0, origFiles.size)
+        assertEquals("Thumb dir must be empty after compensation", 0, thumbFiles.size)
+    }
 }

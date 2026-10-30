@@ -307,4 +307,240 @@ class PhotoViewModelTest {
 
         eventJob.cancel()
     }
+
+    @Test
+    fun testStateCombinations_QueryAndChipsAndSort() = runTest {
+        val tagReceipt = TagEntity(id = 1L, name = "Receipt", normalizedName = "receipt")
+        val tagOffice = TagEntity(id = 2L, name = "Office", normalizedName = "office")
+
+        val p1 = PhotoWithTags(
+            photo = PhotoEntity(
+                id = 1L, originalPath = "photos/orig/1.jpg", thumbPath = "photos/thumbs/1.jpg",
+                sha256 = "sha1", mimeType = "image/jpeg", width = 100, height = 100,
+                sizeBytes = 1000L, addedAt = 1000L, takenAt = null, note = "Note 1"
+            ),
+            tags = listOf(tagReceipt)
+        )
+        val p2 = PhotoWithTags(
+            photo = PhotoEntity(
+                id = 2L, originalPath = "photos/orig/2.jpg", thumbPath = "photos/thumbs/2.jpg",
+                sha256 = "sha2", mimeType = "image/jpeg", width = 100, height = 100,
+                sizeBytes = 1000L, addedAt = 2000L, takenAt = null, note = "Note 2"
+            ),
+            tags = listOf(tagReceipt, tagOffice)
+        )
+        val p3 = PhotoWithTags(
+            photo = PhotoEntity(
+                id = 3L, originalPath = "photos/orig/3.jpg", thumbPath = "photos/thumbs/3.jpg",
+                sha256 = "sha3", mimeType = "image/jpeg", width = 100, height = 100,
+                sizeBytes = 1000L, addedAt = 3000L, takenAt = null, note = "Note 3"
+            ),
+            tags = listOf(tagOffice)
+        )
+        val p4 = PhotoWithTags(
+            photo = PhotoEntity(
+                id = 4L, originalPath = "photos/orig/4.jpg", thumbPath = "photos/thumbs/4.jpg",
+                sha256 = "sha4", mimeType = "image/jpeg", width = 100, height = 100,
+                sizeBytes = 1000L, addedAt = 4000L, takenAt = null, note = "Note 4"
+            ),
+            tags = emptyList() // Untagged
+        )
+
+        repository.photosFlow.value = listOf(p1, p2, p3, p4)
+        repository.tagsFlow.value = listOf(
+            TagWithCount(1L, "Receipt", "receipt", 2),
+            TagWithCount(2L, "Office", "office", 2)
+        )
+
+        val savedState = SavedStateHandle()
+        val viewModel = PhotoViewModel(repository, savedState, testDispatcher)
+
+        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        // 1. Combination: Query "office" + Chip [Receipt]
+        // p2 has tag Receipt AND matches query "office" (via tag Office)
+        // p1 has tag Receipt but NOT query "office" -> excluded
+        // p3 matches query "office" but NOT chip Receipt -> excluded
+        viewModel.onQueryChanged("office")
+        viewModel.onTagChipToggled(1L) // Receipt
+        advanceUntilIdle()
+        var state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(1, state.photos.size)
+        assertEquals(2L, state.photos[0].photo.id)
+
+        // 2. Combination: Query "receipt" + Untagged
+        // Untagged photos have no tags, so matching query "receipt" yields 0
+        viewModel.onUntaggedToggled()
+        advanceUntilIdle()
+        state = viewModel.uiState.value as MainUiState.Success
+        // Untagged toggled cleared chips
+        assertTrue(state.filterState.selectedTagIds.isEmpty())
+        assertTrue(state.filterState.untaggedOnly)
+        assertEquals(0, state.photos.size)
+
+        // 3. Clear query, Untagged only
+        viewModel.onQueryChanged("")
+        advanceUntilIdle()
+        state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(1, state.photos.size)
+        assertEquals(4L, state.photos[0].photo.id)
+
+        // 4. Toggling a tag chip clears untaggedOnly
+        viewModel.onTagChipToggled(2L) // Office
+        advanceUntilIdle()
+        state = viewModel.uiState.value as MainUiState.Success
+        assertFalse(state.filterState.untaggedOnly)
+        assertEquals(setOf(2L), state.filterState.selectedTagIds)
+        assertEquals(2, state.photos.size) // p2 and p3
+
+        // 5. Test all 3 sort orders on the filtered subset (p2 addedAt=2000, p3 addedAt=3000)
+        viewModel.onSortOrderSelected(SortOrder.NEWEST)
+        advanceUntilIdle()
+        state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(listOf(3L, 2L), state.photos.map { it.photo.id })
+
+        viewModel.onSortOrderSelected(SortOrder.OLDEST)
+        advanceUntilIdle()
+        state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(listOf(2L, 3L), state.photos.map { it.photo.id })
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testProcessDeathSavedStateHandleRestore() = runTest {
+        createSampleData()
+        val originalHandle = SavedStateHandle()
+        val vm1 = PhotoViewModel(repository, originalHandle, testDispatcher)
+
+        val job1 = launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm1.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        // User mutates state in vm1
+        vm1.onQueryChanged("office")
+        vm1.onTagChipToggled(2L)
+        vm1.onSortOrderSelected(SortOrder.TAG_NAME)
+        advanceUntilIdle()
+
+        // Verify state handle persisted all changes
+        assertEquals("office", originalHandle.get<String>("key_query"))
+        assertEquals(listOf(2L), originalHandle.get<List<Long>>("key_selected_tag_ids"))
+        assertEquals(false, originalHandle.get<Boolean>("key_untagged_only"))
+        assertEquals(SortOrder.TAG_NAME.name, originalHandle.get<String>("key_sort_order"))
+        job1.cancel()
+
+        // Simulate process recreation: new ViewModel with the same SavedStateHandle
+        val vm2 = PhotoViewModel(repository, originalHandle, testDispatcher)
+        val job2 = launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm2.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        val state2 = vm2.uiState.value as MainUiState.Success
+        assertEquals("office", state2.filterState.query)
+        assertEquals(setOf(2L), state2.filterState.selectedTagIds)
+        assertFalse(state2.filterState.untaggedOnly)
+        assertEquals(SortOrder.TAG_NAME, state2.sortOrder)
+        assertEquals(1, state2.photos.size)
+        assertEquals(2L, state2.photos[0].photo.id)
+
+        job2.cancel()
+    }
+
+    @Test
+    fun testUndoRestoresPhotoRowsAndAllTagLinks() = runTest {
+        val tag1 = TagEntity(id = 1L, name = "Receipt", normalizedName = "receipt")
+        val tag2 = TagEntity(id = 2L, name = "Office", normalizedName = "office")
+
+        val p1 = PhotoWithTags(
+            photo = PhotoEntity(
+                id = 1L, originalPath = "photos/orig/1.jpg", thumbPath = "photos/thumbs/1.jpg",
+                sha256 = "sha1", mimeType = "image/jpeg", width = 100, height = 100,
+                sizeBytes = 1000L, addedAt = 1000L, takenAt = null, note = ""
+            ),
+            tags = listOf(tag1)
+        )
+        val p2 = PhotoWithTags(
+            photo = PhotoEntity(
+                id = 2L, originalPath = "photos/orig/2.jpg", thumbPath = "photos/thumbs/2.jpg",
+                sha256 = "sha2", mimeType = "image/jpeg", width = 100, height = 100,
+                sizeBytes = 1000L, addedAt = 2000L, takenAt = null, note = ""
+            ),
+            tags = listOf(tag1, tag2)
+        )
+
+        repository.photosFlow.value = listOf(p1, p2)
+        repository.tagsFlow.value = listOf(
+            TagWithCount(1L, "Receipt", "receipt", 2),
+            TagWithCount(2L, "Office", "office", 1)
+        )
+
+        val savedState = SavedStateHandle()
+        val viewModel = PhotoViewModel(repository, savedState, testDispatcher)
+
+        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        // Delete both photos
+        viewModel.deletePhotos(listOf(1L, 2L))
+        advanceTimeBy(1000L)
+        testScheduler.runCurrent()
+
+        var state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(0, state.photos.size)
+        assertEquals(2, repository.deletedBackups.size)
+
+        // Undo delete
+        viewModel.undoDelete()
+        testScheduler.runCurrent()
+
+        state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(2, state.photos.size)
+
+        // Verify tag links are preserved
+        val restoredP1 = state.photos.find { it.photo.id == 1L }!!
+        assertEquals(1, restoredP1.tags.size)
+        assertEquals("receipt", restoredP1.tags[0].normalizedName)
+
+        val restoredP2 = state.photos.find { it.photo.id == 2L }!!
+        assertEquals(2, restoredP2.tags.size)
+        val p2TagNames = restoredP2.tags.map { it.normalizedName }.toSet()
+        assertEquals(setOf("receipt", "office"), p2TagNames)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testDynamicRemovalOfVanishedSelectedTagWhenTagsChange() = runTest {
+        createSampleData()
+        // Start with tags 1 and 2 selected
+        val savedState = SavedStateHandle(mapOf("key_selected_tag_ids" to listOf(1L, 2L)))
+        val viewModel = PhotoViewModel(repository, savedState, testDispatcher)
+
+        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        var state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(setOf(1L, 2L), state.filterState.selectedTagIds)
+
+        // Dynamically simulate tag 2 being deleted from database/repository
+        repository.tagsFlow.value = listOf(TagWithCount(1L, "Receipt", "receipt", 2))
+        advanceUntilIdle()
+
+        state = viewModel.uiState.value as MainUiState.Success
+        // Tag 2 must be automatically pruned from state and SavedStateHandle
+        assertEquals(setOf(1L), state.filterState.selectedTagIds)
+        assertEquals(listOf(1L), savedState.get<List<Long>>("key_selected_tag_ids"))
+
+        collectJob.cancel()
+    }
 }
