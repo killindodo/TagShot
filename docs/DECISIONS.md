@@ -13,6 +13,8 @@ This document records architectural decisions, deviations, and version pins per 
 - **D8:** Duplicate detection via SHA-256, undo delete with 8-second window, bulk selection, tag manager (rename/merge/delete), swipe pager, untagged filter, orphan-file sweeper.
 - **D9:** Sort by `addedAt` desc/asc with tie-break by `id`. `takenAt` from EXIF used for display.
 - **D10:** Fixed square cells in grid with `ContentScale.Crop`.
+- **D11:** Robolectric unusable on Termux (Conscrypt JNI is glibc-only); DAO, thumbnail-orientation and import tests run as instrumentation tests.
+
 
 ## Toolchain & Environment Decisions
 - **E1:** Termux ARM64 environment. Overrode `android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2` in `~/.gradle/gradle.properties` due to stock AAPT2 being x86-64 ELF.
@@ -21,6 +23,7 @@ This document records architectural decisions, deviations, and version pins per 
 - **E4:** Gradle wrapper pinned to 8.7 (`distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip`). Compatible with AGP 8.4.2.
 - **E5:** Kotlin `1.9.24`, KSP `1.9.24-1.0.20`, Compose Compiler Extension `1.5.14`, Compose BOM `2024.06.00`.
 - **E6:** Deletion of existing `~/boultfit` (5.2 GB) authorized by human owner Surya to restore free disk space from 2.4 GB to 8.2 GB, satisfying Section 2.2 requirement of >= 4 GB free storage.
+- **E7:** Robolectric fails on Termux with `java.lang.UnsatisfiedLinkError: no conscrypt_openjdk_jni-linux-aarch_64` due to glibc/Bionic JNI incompatibility. Stopped per Section 11 to report to owner.
 
 ## Unverified Items
 - None. All dependencies, toolchain items, and paths verified in this session.

@@ -31,6 +31,8 @@ All dependencies below were verified via HTTP HEAD/GET request returning `HTTP/2
 |---|---|---|
 | `junit:junit:4.13.2` | repo1.maven.org | 200 |
 | `org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1` | repo1.maven.org | 200 |
+| `androidx.test:runner:1.5.2` | dl.google.com | 200 |
+| `androidx.test.ext:junit:1.1.5` | dl.google.com | 200 |
 | `androidx.test:core:1.5.0` | dl.google.com | 200 |
 | `androidx.room:room-testing:2.6.1` | dl.google.com | 200 |
-| `org.robolectric:robolectric:4.12.2` | repo1.maven.org | 200 |
+

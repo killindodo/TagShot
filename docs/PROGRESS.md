@@ -67,6 +67,33 @@ BUILD SUCCESSFUL in 3m 52s
 ---
 
 ## Phase 2: Database Layer
+- Status: PASSED
+- Schema Verification: PASSED (`app/schemas/com.tagshot.app.data.AppDatabase/1.json` generated and verified).
+- KSP & Kotlin compilation: PASSED.
+- Decision D11 executed: Moved `PhotoDaoTest` to Android connected instrumentation tests (`app/src/androidTest/java/com/tagshot/app/data/PhotoDaoTest.kt`).
+- Gate Command:
+```bash
+./gradlew connectedDebugAndroidTest
+```
+- Output:
+```
+> Task :app:connectedDebugAndroidTest
+Starting 7 tests on I2221 - 16
+
+I2221 - 16 Tests 7/7 completed. (0 skipped) (0 failed)
+Finished 7 tests on I2221 - 16
+
+BUILD SUCCESSFUL in 2m 37s
+66 actionable tasks: 27 executed, 6 from cache, 33 up-to-date
+```
+- Total tests: 7 tests completed, 0 failures, 0 skipped.
+
+---
+
+## Phase 3: File Pipeline + Import
 - Status: In Progress
+
+
+
 
 
