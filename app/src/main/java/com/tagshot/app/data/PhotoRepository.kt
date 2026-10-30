@@ -1,5 +1,6 @@
 package com.tagshot.app.data
 
+import android.content.Context
 import android.net.Uri
 import com.tagshot.app.domain.TagNormalizer
 import com.tagshot.app.domain.TagResult
@@ -11,12 +12,19 @@ import java.io.File
 interface PhotoRepository {
     fun observePhotos(): Flow<List<PhotoWithTags>>
     fun observeTags(): Flow<List<TagWithCount>>
+    fun observeFolderNames(): Flow<List<String>>
     suspend fun getPhotoWithTagsById(id: Long): PhotoWithTags?
     suspend fun importUris(
         uris: List<Uri>,
         tags: List<TagResult.Valid>,
+        folderName: String = "",
         onProgress: (BatchImportSummary) -> Unit
     ): BatchImportSummary
+    suspend fun importFolder(
+        treeUri: Uri,
+        tags: List<TagResult.Valid>,
+        onProgress: (BatchImportSummary) -> Unit
+    ): Pair<String, BatchImportSummary>
     suspend fun importCameraFile(file: File, tags: List<TagResult.Valid>): SingleImportResult
     suspend fun addTagsToPhotos(photoIds: List<Long>, tags: List<TagResult.Valid>)
     suspend fun removeTagFromPhoto(photoId: Long, tagId: Long)
@@ -31,22 +39,41 @@ interface PhotoRepository {
 class DefaultPhotoRepository(
     private val photoDao: PhotoDao,
     private val fileManager: PhotoFileManager,
-    private val importUseCase: ImportUseCase
+    private val importUseCase: ImportUseCase,
+    private val context: Context? = null
 ) : PhotoRepository {
 
     override fun observePhotos(): Flow<List<PhotoWithTags>> = photoDao.observePhotosWithTags()
 
     override fun observeTags(): Flow<List<TagWithCount>> = photoDao.observeTagsWithCount()
 
+    override fun observeFolderNames(): Flow<List<String>> = photoDao.observeFolderNames()
+
     override suspend fun getPhotoWithTagsById(id: Long): PhotoWithTags? =
         photoDao.getPhotoWithTagsById(id)
-
 
     override suspend fun importUris(
         uris: List<Uri>,
         tags: List<TagResult.Valid>,
+        folderName: String,
         onProgress: (BatchImportSummary) -> Unit
-    ): BatchImportSummary = importUseCase.importBatch(uris, tags, onProgress)
+    ): BatchImportSummary = importUseCase.importBatch(uris, tags, folderName, onProgress)
+
+    override suspend fun importFolder(
+        treeUri: Uri,
+        tags: List<TagResult.Valid>,
+        onProgress: (BatchImportSummary) -> Unit
+    ): Pair<String, BatchImportSummary> = withContext(Dispatchers.IO) {
+        val appContext = context ?: throw IllegalStateException("Context required to scan folder")
+        val scanResult = DocumentTreeScanner.scanFolder(appContext, treeUri)
+        val summary = importUseCase.importBatch(
+            uris = scanResult.imageUris,
+            tags = tags,
+            folderName = scanResult.folderName,
+            onProgress = onProgress
+        )
+        Pair(scanResult.folderName, summary)
+    }
 
     override suspend fun importCameraFile(file: File, tags: List<TagResult.Valid>): SingleImportResult {
         val result = importUseCase.importSingle(Uri.fromFile(file), tags)

@@ -38,6 +38,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE sha256 = :sha256 LIMIT 1")
     suspend fun getPhotoBySha256(sha256: String): PhotoEntity?
 
+    @Query("SELECT DISTINCT folderName FROM photos WHERE folderName != '' ORDER BY folderName ASC")
+    fun observeFolderNames(): Flow<List<String>>
+
     @Query("SELECT * FROM photos")
     suspend fun getAllPhotos(): List<PhotoEntity>
 

@@ -22,5 +22,6 @@ data class PhotoEntity(
     val sizeBytes: Long,
     val addedAt: Long,
     val takenAt: Long?,
-    val note: String = ""
+    val note: String = "",
+    val folderName: String = ""
 )

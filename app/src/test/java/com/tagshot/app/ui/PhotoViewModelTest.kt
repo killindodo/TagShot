@@ -36,6 +36,7 @@ import java.io.File
 class FakePhotoRepository : PhotoRepository {
     val photosFlow = MutableStateFlow<List<PhotoWithTags>>(emptyList())
     val tagsFlow = MutableStateFlow<List<TagWithCount>>(emptyList())
+    val foldersFlow = MutableStateFlow<List<String>>(emptyList())
 
     val deletedBackups = mutableListOf<DeletedPhotoBackup>()
     val finalizedDeletes = mutableListOf<DeletedPhotoBackup>()
@@ -43,6 +44,7 @@ class FakePhotoRepository : PhotoRepository {
 
     override fun observePhotos(): Flow<List<PhotoWithTags>> = photosFlow
     override fun observeTags(): Flow<List<TagWithCount>> = tagsFlow
+    override fun observeFolderNames(): Flow<List<String>> = foldersFlow
 
     override suspend fun getPhotoWithTagsById(id: Long): PhotoWithTags? =
         photosFlow.value.find { it.photo.id == id }
@@ -50,11 +52,21 @@ class FakePhotoRepository : PhotoRepository {
     override suspend fun importUris(
         uris: List<Uri>,
         tags: List<TagResult.Valid>,
+        folderName: String,
         onProgress: (BatchImportSummary) -> Unit
     ): BatchImportSummary {
         val summary = BatchImportSummary(done = uris.size, total = uris.size, imported = uris.size, duplicates = 0, failed = 0)
         onProgress(summary)
         return summary
+    }
+
+    override suspend fun importFolder(
+        treeUri: Uri,
+        tags: List<TagResult.Valid>,
+        onProgress: (BatchImportSummary) -> Unit
+    ): Pair<String, BatchImportSummary> {
+        val summary = BatchImportSummary(done = 0, total = 0, imported = 0, duplicates = 0, failed = 0)
+        return Pair("TestFolder", summary)
     }
 
     override suspend fun importCameraFile(file: File, tags: List<TagResult.Valid>): SingleImportResult {
@@ -540,6 +552,67 @@ class PhotoViewModelTest {
         // Tag 2 must be automatically pruned from state and SavedStateHandle
         assertEquals(setOf(1L), state.filterState.selectedTagIds)
         assertEquals(listOf(1L), savedState.get<List<Long>>("key_selected_tag_ids"))
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testFolderWiseViewFiltersPhotosAndGroupsByFolder() = runTest {
+        val p1 = PhotoEntity(id = 1L, originalPath = "p1", thumbPath = "t1", sha256 = "s1", mimeType = "image/jpeg", width = 100, height = 100, sizeBytes = 100, addedAt = 1000, takenAt = null, note = "", folderName = "Receipts")
+        val p2 = PhotoEntity(id = 2L, originalPath = "p2", thumbPath = "t2", sha256 = "s2", mimeType = "image/jpeg", width = 100, height = 100, sizeBytes = 100, addedAt = 2000, takenAt = null, note = "", folderName = "Trips")
+        val p3 = PhotoEntity(id = 3L, originalPath = "p3", thumbPath = "t3", sha256 = "s3", mimeType = "image/jpeg", width = 100, height = 100, sizeBytes = 100, addedAt = 3000, takenAt = null, note = "", folderName = "Receipts")
+
+        val tag1 = TagEntity(id = 1L, name = "Food", normalizedName = "food")
+        val tag2 = TagEntity(id = 2L, name = "Hotel", normalizedName = "hotel")
+
+        repository.photosFlow.value = listOf(
+            PhotoWithTags(p1, listOf(tag1)),
+            PhotoWithTags(p2, listOf(tag2)),
+            PhotoWithTags(p3, listOf(tag1, tag2))
+        )
+        repository.tagsFlow.value = listOf(
+            TagWithCount(1L, "Food", "food", 2),
+            TagWithCount(2L, "Hotel", "hotel", 2)
+        )
+
+        val viewModel = PhotoViewModel(repository, SavedStateHandle(), testDispatcher)
+        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        var state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(3, state.photos.size)
+        assertEquals(2, state.allFolders.size)
+        assertEquals("Receipts", state.allFolders[0].name)
+        assertEquals(2, state.allFolders[0].photoCount)
+        assertEquals("Trips", state.allFolders[1].name)
+        assertEquals(1, state.allFolders[1].photoCount)
+
+        // Switch to Folder Wise View
+        viewModel.onTabSelected(MainTab.FOLDER_WISE)
+        advanceUntilIdle()
+
+        state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(MainTab.FOLDER_WISE, state.activeTab)
+        assertEquals(3, state.photos.size)
+
+        // Select specific folder "Receipts"
+        viewModel.onFolderSelected("Receipts")
+        advanceUntilIdle()
+
+        state = viewModel.uiState.value as MainUiState.Success
+        assertEquals("Receipts", state.selectedFolder)
+        assertEquals(2, state.photos.size)
+        assertTrue(state.photos.all { it.photo.folderName == "Receipts" })
+
+        // Apply tag filter within folder: filter by "Hotel"
+        viewModel.onTagChipToggled(2L)
+        advanceUntilIdle()
+
+        state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(1, state.photos.size)
+        assertEquals(3L, state.photos[0].photo.id)
 
         collectJob.cancel()
     }

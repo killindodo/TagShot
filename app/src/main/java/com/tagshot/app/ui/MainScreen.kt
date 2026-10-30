@@ -38,7 +38,9 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
@@ -61,6 +63,8 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -104,11 +108,23 @@ fun MainScreen(
     // Pending camera file preserved across process death per Section 4.1
     var pendingCameraFileName by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingImportUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var pendingFolderUri by remember { mutableStateOf<Uri?>(null) }
     var showTagImportDialog by remember { mutableStateOf(false) }
     var showCameraTagDialog by remember { mutableStateOf(false) }
+    var showFolderTagDialog by remember { mutableStateOf(false) }
     var showBulkAddTagDialog by remember { mutableStateOf(false) }
     var showBulkRemoveTagDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    // Folder Picker Launcher
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri ->
+        if (treeUri != null) {
+            pendingFolderUri = treeUri
+            showFolderTagDialog = true
+        }
+    }
 
     // Camera Capture Launcher
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -199,7 +215,8 @@ fun MainScreen(
             } else {
                 MainTopBar(
                     viewModel = viewModel,
-                    onNavigateToTagManager = onNavigateToTagManager
+                    onNavigateToTagManager = onNavigateToTagManager,
+                    onSelectFolderClick = { folderPickerLauncher.launch(null) }
                 )
             }
         },
@@ -224,6 +241,9 @@ fun MainScreen(
                         pickerLauncher.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
+                    },
+                    onFolderClick = {
+                        folderPickerLauncher.launch(null)
                     }
                 )
             }
@@ -255,6 +275,33 @@ fun MainScreen(
                         }
                     }
 
+                    // Navigation Tabs: All Photos vs Folder Wise View
+                    TabRow(
+                        selectedTabIndex = if (state.activeTab == MainTab.ALL_PHOTOS) 0 else 1,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Tab(
+                            selected = state.activeTab == MainTab.ALL_PHOTOS,
+                            onClick = { viewModel.onTabSelected(MainTab.ALL_PHOTOS) },
+                            text = { Text("All Photos") }
+                        )
+                        Tab(
+                            selected = state.activeTab == MainTab.FOLDER_WISE,
+                            onClick = { viewModel.onTabSelected(MainTab.FOLDER_WISE) },
+                            text = { Text("Folder Wise View") }
+                        )
+                    }
+
+                    // In Folder Wise View, show the Folder Selector row
+                    if (state.activeTab == MainTab.FOLDER_WISE) {
+                        FolderSelectorRow(
+                            allFolders = state.allFolders,
+                            selectedFolder = state.selectedFolder,
+                            onSelectFolder = { viewModel.onFolderSelected(it) },
+                            onAddNewFolderClick = { folderPickerLauncher.launch(null) }
+                        )
+                    }
+
                     // Tag Filter Chips Row
                     TagChipsRow(
                         viewModel = viewModel,
@@ -262,7 +309,9 @@ fun MainScreen(
                     )
 
                     // Content Grid or Empty States
-                    if (state.totalLibraryCount == 0) {
+                    if (state.activeTab == MainTab.FOLDER_WISE && state.allFolders.isEmpty()) {
+                        EmptyFolderView(onSelectFolder = { folderPickerLauncher.launch(null) })
+                    } else if (state.totalLibraryCount == 0) {
                         EmptyLibraryView()
                     } else if (state.photos.isEmpty()) {
                         EmptyFilterView(onClearFilters = { viewModel.onClearFilters() })
@@ -319,6 +368,26 @@ fun MainScreen(
                 viewModel.importPhotos(pendingImportUris, rawTags)
                 pendingImportUris = emptyList()
                 showTagImportDialog = false
+            }
+        )
+    }
+
+    // Dialog: Tag input when importing photos from a folder
+    if (showFolderTagDialog && pendingFolderUri != null) {
+        val treeUri = pendingFolderUri!!
+        val allTags = (uiState as? MainUiState.Success)?.allTags ?: emptyList()
+        TagInputDialog(
+            title = "Tag Folder Photos (Optional)",
+            allExistingTags = allTags,
+            onDismiss = {
+                viewModel.importFolder(treeUri, "")
+                pendingFolderUri = null
+                showFolderTagDialog = false
+            },
+            onConfirm = { rawTags ->
+                viewModel.importFolder(treeUri, rawTags)
+                pendingFolderUri = null
+                showFolderTagDialog = false
             }
         )
     }
@@ -393,7 +462,8 @@ fun MainScreen(
 @Composable
 private fun MainTopBar(
     viewModel: PhotoViewModel,
-    onNavigateToTagManager: () -> Unit
+    onNavigateToTagManager: () -> Unit,
+    onSelectFolderClick: () -> Unit
 ) {
     val query by viewModel.queryFlow.collectAsState()
     val sortOrderName by viewModel.sortOrderFlow.collectAsState()
@@ -469,6 +539,14 @@ private fun MainTopBar(
                     onDismissRequest = { showOverflowMenu = false }
                 ) {
                     DropdownMenuItem(
+                        text = { Text("Select Folder") },
+                        leadingIcon = { Icon(Icons.Default.CreateNewFolder, null) },
+                        onClick = {
+                            showOverflowMenu = false
+                            onSelectFolderClick()
+                        }
+                    )
+                    DropdownMenuItem(
                         text = { Text("Tag Manager") },
                         onClick = {
                             showOverflowMenu = false
@@ -532,7 +610,8 @@ private fun TagChipsRow(
 @Composable
 private fun MainFab(
     onCameraClick: () -> Unit,
-    onGalleryClick: () -> Unit
+    onGalleryClick: () -> Unit,
+    onFolderClick: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -545,6 +624,15 @@ private fun MainFab(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                FloatingActionButton(
+                    onClick = {
+                        expanded = false
+                        onFolderClick()
+                    },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.Default.CreateNewFolder, contentDescription = "Select Folder")
+                }
                 FloatingActionButton(
                     onClick = {
                         expanded = false
@@ -587,6 +675,80 @@ private fun EmptyLibraryView() {
             Text("No photos saved yet", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
             Text("Tap + below to take a photo or pick from gallery", style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun FolderSelectorRow(
+    allFolders: List<FolderItem>,
+    selectedFolder: String,
+    onSelectFolder: (String) -> Unit,
+    onAddNewFolderClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Button(
+            onClick = onAddNewFolderClick,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+            Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Select Folder")
+        }
+
+        FilterChip(
+            selected = selectedFolder.isEmpty(),
+            onClick = { onSelectFolder("") },
+            label = { Text("All Folders") },
+            leadingIcon = if (selectedFolder.isEmpty()) {
+                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+            } else null
+        )
+
+        for (folder in allFolders) {
+            val isSelected = selectedFolder == folder.name
+            FilterChip(
+                selected = isSelected,
+                onClick = { onSelectFolder(folder.name) },
+                label = { Text("${folder.name} (${folder.photoCount})") },
+                leadingIcon = {
+                    Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp))
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyFolderView(onSelectFolder: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Default.Folder,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("No folders selected yet", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Select a folder to view and tag photos inside it", style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onSelectFolder) {
+                Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Select Folder")
+            }
         }
     }
 }

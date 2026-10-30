@@ -28,6 +28,6 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     override val photoRepository: PhotoRepository by lazy {
-        DefaultPhotoRepository(database.photoDao(), fileManager, importUseCase)
+        DefaultPhotoRepository(database.photoDao(), fileManager, importUseCase, context)
     }
 }

@@ -35,11 +35,24 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
+enum class MainTab {
+    ALL_PHOTOS,
+    FOLDER_WISE
+}
+
+data class FolderItem(
+    val name: String,
+    val photoCount: Int
+)
+
 sealed interface MainUiState {
     data object Loading : MainUiState
     data class Success(
         val photos: List<PhotoWithTags>,
         val allTags: List<TagWithCount>,
+        val allFolders: List<FolderItem> = emptyList(),
+        val activeTab: MainTab = MainTab.ALL_PHOTOS,
+        val selectedFolder: String = "",
         val totalLibraryCount: Int,
         val untaggedCount: Int,
         val filterState: FilterState,
@@ -59,7 +72,9 @@ private data class FilterOptions(
     val query: String,
     val selectedTagIds: List<Long>,
     val untaggedOnly: Boolean,
-    val sortOrderName: String
+    val sortOrderName: String,
+    val activeTabName: String,
+    val selectedFolder: String
 )
 
 private data class ImportState(
@@ -79,6 +94,8 @@ class PhotoViewModel(
         private const val KEY_SELECTED_TAG_IDS = "key_selected_tag_ids"
         private const val KEY_UNTAGGED_ONLY = "key_untagged_only"
         private const val KEY_SORT_ORDER = "key_sort_order"
+        private const val KEY_ACTIVE_TAB = "key_active_tab"
+        private const val KEY_SELECTED_FOLDER = "key_selected_folder"
     }
 
     // Persisted state via SavedStateHandle
@@ -86,6 +103,8 @@ class PhotoViewModel(
     val selectedTagIdsFlow = savedStateHandle.getStateFlow<List<Long>>(KEY_SELECTED_TAG_IDS, emptyList())
     val untaggedOnlyFlow = savedStateHandle.getStateFlow(KEY_UNTAGGED_ONLY, false)
     val sortOrderFlow = savedStateHandle.getStateFlow(KEY_SORT_ORDER, SortOrder.NEWEST.name)
+    val activeTabFlow = savedStateHandle.getStateFlow(KEY_ACTIVE_TAB, MainTab.ALL_PHOTOS.name)
+    val selectedFolderFlow = savedStateHandle.getStateFlow(KEY_SELECTED_FOLDER, "")
 
     // Selection mode state
     private val _selectedPhotoIds = MutableStateFlow<Set<Long>>(emptySet())
@@ -113,9 +132,12 @@ class PhotoViewModel(
         queryFlow,
         selectedTagIdsFlow,
         untaggedOnlyFlow,
-        sortOrderFlow
-    ) { query, selectedTagIds, untaggedOnly, sortOrderName ->
-        FilterOptions(query, selectedTagIds, untaggedOnly, sortOrderName)
+        sortOrderFlow,
+        activeTabFlow
+    ) { query, selectedTagIds, untaggedOnly, sortOrderName, activeTabName ->
+        FilterOptions(query, selectedTagIds, untaggedOnly, sortOrderName, activeTabName, selectedFolderFlow.value)
+    }.combine(selectedFolderFlow) { opts, folder ->
+        opts.copy(selectedFolder = folder)
     }
 
     private val importStateFlow: Flow<ImportState> = combine(
@@ -141,6 +163,20 @@ class PhotoViewModel(
             }
         }
 
+        val activeTab = try {
+            MainTab.valueOf(filterOpts.activeTabName)
+        } catch (_: Exception) {
+            MainTab.ALL_PHOTOS
+        }
+
+        val allFolders = photos
+            .map { it.photo.folderName }
+            .filter { it.isNotBlank() }
+            .groupingBy { it }
+            .eachCount()
+            .map { FolderItem(it.key, it.value) }
+            .sortedBy { it.name }
+
         val filterState = FilterState(
             query = filterOpts.query,
             selectedTagIds = validSelectedTagIds,
@@ -156,8 +192,19 @@ class PhotoViewModel(
         val totalLibraryCount = photos.size
         val untaggedCount = photos.count { it.tags.isEmpty() }
 
+        // Filter by folder if on FOLDER_WISE tab
+        val basePhotos = if (activeTab == MainTab.FOLDER_WISE) {
+            if (filterOpts.selectedFolder.isNotBlank()) {
+                photos.filter { it.photo.folderName == filterOpts.selectedFolder }
+            } else {
+                photos.filter { it.photo.folderName.isNotBlank() }
+            }
+        } else {
+            photos
+        }
+
         // 1. Filter using domain PhotoFilter
-        val filtered = PhotoFilter.filter(photos, filterState) { p ->
+        val filtered = PhotoFilter.filter(basePhotos, filterState) { p ->
             FilterPhoto(
                 id = p.photo.id,
                 normalizedTags = p.tags.map { it.normalizedName }.toSet(),
@@ -177,6 +224,9 @@ class PhotoViewModel(
         MainUiState.Success(
             photos = sorted,
             allTags = tags,
+            allFolders = allFolders,
+            activeTab = activeTab,
+            selectedFolder = filterOpts.selectedFolder,
             totalLibraryCount = totalLibraryCount,
             untaggedCount = untaggedCount,
             filterState = filterState,
@@ -192,6 +242,14 @@ class PhotoViewModel(
 
 
     // --- Search & Filter Actions ---
+
+    fun onTabSelected(tab: MainTab) {
+        savedStateHandle[KEY_ACTIVE_TAB] = tab.name
+    }
+
+    fun onFolderSelected(folderName: String) {
+        savedStateHandle[KEY_SELECTED_FOLDER] = folderName
+    }
 
     fun onQueryChanged(newQuery: String) {
         savedStateHandle[KEY_QUERY] = newQuery
@@ -297,6 +355,45 @@ class PhotoViewModel(
                     _eventChannel.send(UiEvent.ShowMessage("Failed to save camera photo"))
                 }
             }
+        }
+    }
+
+    fun importFolder(treeUri: Uri, rawTags: String) {
+        viewModelScope.launch {
+            val tags = when (val parseResult = TagParser.parse(rawTags)) {
+                is ParseResult.Success -> parseResult.tags
+                is ParseResult.Failure.TooLong -> {
+                    _eventChannel.send(UiEvent.ShowMessage("Tag too long: ${parseResult.rawText}"))
+                    return@launch
+                }
+                is ParseResult.Failure.TooMany -> {
+                    _eventChannel.send(UiEvent.ShowMessage("Too many tags (max ${Limits.MAX_TAGS_PER_PHOTO})"))
+                    return@launch
+                }
+            }
+
+            _isImporting.value = true
+            _importProgress.value = BatchImportSummary(0, 0, 0, 0, 0)
+
+            val (folderName, summary) = try {
+                repository.importFolder(treeUri, tags) { progress ->
+                    _importProgress.value = progress
+                }
+            } catch (e: Exception) {
+                _isImporting.value = false
+                _importProgress.value = null
+                _eventChannel.send(UiEvent.ShowMessage("Failed to import folder: ${e.message}"))
+                return@launch
+            }
+
+            _isImporting.value = false
+            _importProgress.value = null
+
+            // Automatically switch to Folder Wise View and focus on the imported folder
+            onTabSelected(MainTab.FOLDER_WISE)
+            onFolderSelected(folderName)
+
+            _eventChannel.send(UiEvent.ImportFinished(summary))
         }
     }
 

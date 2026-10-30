@@ -46,7 +46,8 @@ class ImportUseCase(
 
     suspend fun importSingle(
         uri: Uri,
-        tags: List<TagResult.Valid> = emptyList()
+        tags: List<TagResult.Valid> = emptyList(),
+        folderName: String = ""
     ): SingleImportResult = withContext(Dispatchers.IO) {
         val uuid = UUID.randomUUID().toString()
         val tempOrigFile = File(fileManager.origDir, "$uuid.tmp")
@@ -188,7 +189,8 @@ class ImportUseCase(
             sizeBytes = sizeBytes,
             addedAt = System.currentTimeMillis(),
             takenAt = takenAt,
-            note = ""
+            note = "",
+            folderName = folderName
         )
 
         try {
@@ -205,6 +207,7 @@ class ImportUseCase(
     suspend fun importBatch(
         uris: List<Uri>,
         tags: List<TagResult.Valid> = emptyList(),
+        folderName: String = "",
         onProgress: (BatchImportSummary) -> Unit = {}
     ): BatchImportSummary = withContext(Dispatchers.IO) {
         var imported = 0
@@ -214,7 +217,7 @@ class ImportUseCase(
 
         for ((index, uri) in uris.withIndex()) {
             val result = try {
-                importSingle(uri, tags)
+                importSingle(uri, tags, folderName)
             } catch (e: Exception) {
                 SingleImportResult.Failed.Error(e.message ?: "Import failed")
             }
