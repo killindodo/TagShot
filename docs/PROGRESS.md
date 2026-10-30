@@ -208,6 +208,28 @@ BUILD SUCCESSFUL in 58s
 66 actionable tasks: 7 executed, 59 up-to-date
 ```
 
+---
+
+## Phase 8: Hardening & Final Verification
+- Status: PASSED
+- Verified zero `TODO`, `FIXME`, or stub implementations across entire codebase.
+- Lint check: `./gradlew lintDebug` completed with 0 errors (16 informational warnings reviewed).
+- Documentation: Created `README.md` with Termux build prerequisites, AAPT2 override configuration, test commands, installation instructions, and offline limitations.
+- Final Test Gate:
+```bash
+./gradlew testDebugUnitTest
+```
+  - Output: 40/40 tests PASSED (`BUILD SUCCESSFUL in 17s`).
+```bash
+./gradlew connectedDebugAndroidTest
+```
+  - Output: 12/12 on-device tests PASSED on I2221 device (`BUILD SUCCESSFUL in 58s`).
+- APK Delivery:
+  - Built final debug APK via `./gradlew assembleDebug` (`BUILD SUCCESSFUL in 16s`).
+  - Copied to shared storage: `~/storage/downloads/tagshot-debug.apk` (17 MB).
+  - Installed directly to device via ADB: `adb install -r app/build/outputs/apk/debug/app-debug.apk` (`Success`).
+  - Verified runtime launch on device: `adb shell am start -n com.tagshot.app/.MainActivity` (`Starting: Intent { cmp=com.tagshot.app/.MainActivity }`). Logcat confirms clean startup with zero runtime exceptions.
+
 
 
 
