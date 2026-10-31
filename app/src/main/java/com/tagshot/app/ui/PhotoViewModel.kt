@@ -18,6 +18,7 @@ import com.tagshot.app.domain.PhotoFilter
 import com.tagshot.app.domain.PhotoSorter
 import com.tagshot.app.domain.SortOrder
 import com.tagshot.app.domain.SortablePhoto
+import com.tagshot.app.domain.TagMatchMode
 import com.tagshot.app.domain.TagParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 import com.tagshot.app.ui.components.TagDisplaySize
+import com.tagshot.app.ui.theme.AccentPalette
 
 enum class ViewingStyle {
     GRID,
@@ -81,6 +83,7 @@ private data class FilterOptions(
     val query: String,
     val selectedTagIds: List<Long>,
     val untaggedOnly: Boolean,
+    val matchModeName: String,
     val sortOrderName: String,
     val activeTabName: String,
     val selectedFolder: String
@@ -102,12 +105,14 @@ class PhotoViewModel(
         private const val KEY_QUERY = "key_query"
         private const val KEY_SELECTED_TAG_IDS = "key_selected_tag_ids"
         private const val KEY_UNTAGGED_ONLY = "key_untagged_only"
+        private const val KEY_TAG_MATCH_MODE = "key_tag_match_mode"
         private const val KEY_SORT_ORDER = "key_sort_order"
         private const val KEY_ACTIVE_TAB = "key_active_tab"
         private const val KEY_SELECTED_FOLDER = "key_selected_folder"
         private const val KEY_GRID_COLUMNS = "key_grid_columns"
         private const val KEY_HAPTICS_ENABLED = "key_haptics_enabled"
         private const val KEY_THEME_MODE = "key_theme_mode"
+        private const val KEY_ACCENT_PALETTE = "key_accent_palette"
         private const val KEY_VIEWING_STYLE = "key_viewing_style"
         private const val KEY_TAG_DISPLAY_SIZE = "key_tag_display_size"
         private const val KEY_SHOW_LIST_FILE_SIZE = "key_show_list_file_size"
@@ -119,12 +124,14 @@ class PhotoViewModel(
     val queryFlow = savedStateHandle.getStateFlow(KEY_QUERY, "")
     val selectedTagIdsFlow = savedStateHandle.getStateFlow<List<Long>>(KEY_SELECTED_TAG_IDS, emptyList())
     val untaggedOnlyFlow = savedStateHandle.getStateFlow(KEY_UNTAGGED_ONLY, false)
+    val tagMatchModeFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_TAG_MATCH_MODE, TagMatchMode.ANY.name)
     val sortOrderFlow = savedStateHandle.getStateFlow(KEY_SORT_ORDER, SortOrder.NEWEST.name)
     val activeTabFlow = savedStateHandle.getStateFlow(KEY_ACTIVE_TAB, MainTab.ALL_PHOTOS.name)
     val selectedFolderFlow = savedStateHandle.getStateFlow(KEY_SELECTED_FOLDER, "")
     val gridColumns: StateFlow<Int> = savedStateHandle.getStateFlow(KEY_GRID_COLUMNS, 2)
     val hapticsEnabled: StateFlow<Boolean> = savedStateHandle.getStateFlow(KEY_HAPTICS_ENABLED, true)
     val themeModeFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_THEME_MODE, "SYSTEM")
+    val accentPaletteFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_ACCENT_PALETTE, AccentPalette.TITANIUM_SAPPHIRE.name)
     val viewingStyleFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_VIEWING_STYLE, ViewingStyle.GRID.name)
     val tagDisplaySizeFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_TAG_DISPLAY_SIZE, TagDisplaySize.THIN_MICRO.name)
     val showListFileSizeFlow: StateFlow<Boolean> = savedStateHandle.getStateFlow(KEY_SHOW_LIST_FILE_SIZE, true)
@@ -141,6 +148,10 @@ class PhotoViewModel(
 
     fun setThemeMode(mode: String) {
         savedStateHandle[KEY_THEME_MODE] = mode
+    }
+
+    fun setAccentPalette(palette: AccentPalette) {
+        savedStateHandle[KEY_ACCENT_PALETTE] = palette.name
     }
 
     fun setViewingStyle(style: ViewingStyle) {
@@ -161,6 +172,20 @@ class PhotoViewModel(
 
     fun setShowListFolder(show: Boolean) {
         savedStateHandle[KEY_SHOW_LIST_FOLDER] = show
+    }
+
+    fun setTagMatchMode(mode: TagMatchMode) {
+        savedStateHandle[KEY_TAG_MATCH_MODE] = mode.name
+    }
+
+    fun toggleTagMatchMode() {
+        val current = try {
+            TagMatchMode.valueOf(tagMatchModeFlow.value)
+        } catch (_: Exception) {
+            TagMatchMode.ANY
+        }
+        val next = if (current == TagMatchMode.ANY) TagMatchMode.ALL else TagMatchMode.ANY
+        setTagMatchMode(next)
     }
 
     fun cycleViewingStyle() {
@@ -203,10 +228,20 @@ class PhotoViewModel(
         queryFlow,
         selectedTagIdsFlow,
         untaggedOnlyFlow,
-        sortOrderFlow,
-        activeTabFlow
-    ) { query, selectedTagIds, untaggedOnly, sortOrderName, activeTabName ->
-        FilterOptions(query, selectedTagIds, untaggedOnly, sortOrderName, activeTabName, selectedFolderFlow.value)
+        tagMatchModeFlow,
+        sortOrderFlow
+    ) { query, selectedTagIds, untaggedOnly, matchModeName, sortOrderName ->
+        FilterOptions(
+            query = query,
+            selectedTagIds = selectedTagIds,
+            untaggedOnly = untaggedOnly,
+            matchModeName = matchModeName,
+            sortOrderName = sortOrderName,
+            activeTabName = activeTabFlow.value,
+            selectedFolder = selectedFolderFlow.value
+        )
+    }.combine(activeTabFlow) { opts, tab ->
+        opts.copy(activeTabName = tab)
     }.combine(selectedFolderFlow) { opts, folder ->
         opts.copy(selectedFolder = folder)
     }
@@ -253,10 +288,17 @@ class PhotoViewModel(
             }
             .sortedBy { it.name }
 
+        val matchMode = try {
+            TagMatchMode.valueOf(filterOpts.matchModeName)
+        } catch (_: Exception) {
+            TagMatchMode.ANY
+        }
+
         val filterState = FilterState(
             query = filterOpts.query,
             selectedTagIds = validSelectedTagIds,
-            untaggedOnly = filterOpts.untaggedOnly
+            untaggedOnly = filterOpts.untaggedOnly,
+            matchMode = matchMode
         )
 
         val sortOrder = try {

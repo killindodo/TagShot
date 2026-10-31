@@ -38,19 +38,55 @@ class PhotoFilterTest {
         assertFalse(PhotoFilter.matchText(photoUntagged, listOf("beach")))
         assertTrue(PhotoFilter.matchText(photoUntagged, emptyList()))
 
-        // matchChips
-        assertTrue(PhotoFilter.matchChips(photo1, emptySet()))
-        assertTrue(PhotoFilter.matchChips(photo1, setOf(10L, 20L)))
-        assertTrue(PhotoFilter.matchChips(photo1, setOf(10L, 20L, 30L)))
-        assertFalse(PhotoFilter.matchChips(photo1, setOf(10L, 99L)))
-        assertTrue(PhotoFilter.matchChips(photoUntagged, emptySet()))
-        assertFalse(PhotoFilter.matchChips(photoUntagged, setOf(10L)))
+        // matchChips with TagMatchMode.ALL
+        assertTrue(PhotoFilter.matchChips(photo1, emptySet(), TagMatchMode.ALL))
+        assertTrue(PhotoFilter.matchChips(photo1, setOf(10L, 20L), TagMatchMode.ALL))
+        assertTrue(PhotoFilter.matchChips(photo1, setOf(10L, 20L, 30L), TagMatchMode.ALL))
+        assertFalse(PhotoFilter.matchChips(photo1, setOf(10L, 99L), TagMatchMode.ALL))
+        assertTrue(PhotoFilter.matchChips(photoUntagged, emptySet(), TagMatchMode.ALL))
+        assertFalse(PhotoFilter.matchChips(photoUntagged, setOf(10L), TagMatchMode.ALL))
+
+        // matchChips with TagMatchMode.ANY
+        assertTrue(PhotoFilter.matchChips(photo1, emptySet(), TagMatchMode.ANY))
+        assertTrue(PhotoFilter.matchChips(photo1, setOf(10L, 99L), TagMatchMode.ANY))
+        assertFalse(PhotoFilter.matchChips(photo1, setOf(98L, 99L), TagMatchMode.ANY))
+        assertTrue(PhotoFilter.matchChips(photoUntagged, emptySet(), TagMatchMode.ANY))
+        assertFalse(PhotoFilter.matchChips(photoUntagged, setOf(10L), TagMatchMode.ANY))
 
         // matchUntagged
         assertTrue(PhotoFilter.matchUntagged(photo1, untaggedOnly = false))
         assertFalse(PhotoFilter.matchUntagged(photo1, untaggedOnly = true))
         assertTrue(PhotoFilter.matchUntagged(photoUntagged, untaggedOnly = false))
         assertTrue(PhotoFilter.matchUntagged(photoUntagged, untaggedOnly = true))
+    }
+
+    @Test
+    fun testFilterByTagsAnyAndAll() {
+        val p1 = FilterPhoto(1L, setOf("landscape", "nature"), setOf(10L, 20L))
+        val p2 = FilterPhoto(2L, setOf("portrait", "nature"), setOf(30L, 20L))
+        val p3 = FilterPhoto(3L, setOf("architecture"), setOf(40L))
+        val pUntagged = FilterPhoto(4L, emptySet(), emptySet())
+
+        val photos = listOf(p1, p2, p3, pUntagged)
+
+        // Empty tags returns all
+        assertEquals(photos, PhotoFilter.filterByTags(photos, emptySet(), matchMode = TagMatchMode.ANY))
+        assertEquals(photos, PhotoFilter.filterByTags(photos, emptySet(), matchMode = TagMatchMode.ALL))
+
+        // Untagged only
+        val untaggedResult = PhotoFilter.filterByTags(photos, emptySet(), untaggedOnly = true)
+        assertEquals(listOf(pUntagged), untaggedResult)
+
+        // TagMatchMode.ANY: matches photos with at least one selected tag
+        val anyResult = PhotoFilter.filterByTags(photos, setOf(10L, 40L), matchMode = TagMatchMode.ANY)
+        assertEquals(listOf(p1, p3), anyResult)
+
+        // TagMatchMode.ALL: matches photos containing EVERY selected tag
+        val allResult = PhotoFilter.filterByTags(photos, setOf(10L, 20L), matchMode = TagMatchMode.ALL)
+        assertEquals(listOf(p1), allResult)
+
+        val noneResult = PhotoFilter.filterByTags(photos, setOf(10L, 40L), matchMode = TagMatchMode.ALL)
+        assertTrue(noneResult.isEmpty())
     }
 
     @Test
@@ -81,13 +117,21 @@ class PhotoFilterTest {
         assertTrue(baseResult.containsAll(narrowedResult))
         assertTrue(narrowedResult.size <= baseResult.size)
 
-        // Adding a chip never grows result
-        val chipBaseState = FilterState(selectedTagIds = setOf(1L))
+        // Adding a chip with ALL never grows result
+        val chipBaseState = FilterState(selectedTagIds = setOf(1L), matchMode = TagMatchMode.ALL)
         val chipBaseResult = PhotoFilter.filter(photos, chipBaseState) { it }
-        val chipNarrowedState = FilterState(selectedTagIds = setOf(1L, 3L))
+        val chipNarrowedState = FilterState(selectedTagIds = setOf(1L, 3L), matchMode = TagMatchMode.ALL)
         val chipNarrowedResult = PhotoFilter.filter(photos, chipNarrowedState) { it }
         assertTrue(chipBaseResult.containsAll(chipNarrowedResult))
         assertTrue(chipNarrowedResult.size <= chipBaseResult.size)
+
+        // Adding a chip with ANY never shrinks result
+        val anyBaseState = FilterState(selectedTagIds = setOf(1L), matchMode = TagMatchMode.ANY)
+        val anyBaseResult = PhotoFilter.filter(photos, anyBaseState) { it }
+        val anyExpandedState = FilterState(selectedTagIds = setOf(1L, 5L), matchMode = TagMatchMode.ANY)
+        val anyExpandedResult = PhotoFilter.filter(photos, anyExpandedState) { it }
+        assertTrue(anyExpandedResult.containsAll(anyBaseResult))
+        assertTrue(anyExpandedResult.size >= anyBaseResult.size)
 
         // Token order does not matter
         val queryOrder1 = FilterState(query = "apple red")
@@ -136,10 +180,13 @@ class PhotoFilterTest {
                 (1..chipCount).map { (rng.nextInt(tagPool.size) + 1).toLong() }.toSet()
             }
 
+            val matchMode = if (rng.nextBoolean()) TagMatchMode.ANY else TagMatchMode.ALL
+
             val state = FilterState(
                 query = queryStr,
                 selectedTagIds = selectedChips,
-                untaggedOnly = untaggedOnly
+                untaggedOnly = untaggedOnly,
+                matchMode = matchMode
             )
 
             // Production filter
@@ -159,8 +206,11 @@ class PhotoFilterTest {
                 val textOk = oracleTokens.isEmpty() || oracleTokens.all { t ->
                     p.normalizedTags.any { tag -> tag.contains(t) }
                 }
-                val chipsOk = selectedChips.isEmpty() || selectedChips.all { chipId ->
-                    p.tagIds.contains(chipId)
+                val chipsOk = if (selectedChips.isEmpty()) {
+                    true
+                } else when (matchMode) {
+                    TagMatchMode.ANY -> selectedChips.any { chipId -> p.tagIds.contains(chipId) }
+                    TagMatchMode.ALL -> selectedChips.all { chipId -> p.tagIds.contains(chipId) }
                 }
                 val untaggedOk = !untaggedOnly || p.normalizedTags.isEmpty()
                 textOk && chipsOk && untaggedOk

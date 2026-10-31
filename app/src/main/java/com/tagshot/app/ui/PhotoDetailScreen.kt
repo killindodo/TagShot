@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.tagshot.app.data.PhotoWithTags
 import com.tagshot.app.domain.Limits
+import com.tagshot.app.ui.components.SwipeDismissBox
 import com.tagshot.app.ui.components.ZoomableImage
 import kotlinx.coroutines.launch
 import java.io.File
@@ -151,11 +152,12 @@ fun PhotoDetailScreen(
             )
         }
     ) { paddingValues ->
-        Box(
+        SwipeDismissBox(
+            onDismiss = safeNavigateBack,
+            enabled = !isZoomed,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.Black)
         ) {
             HorizontalPager(
                 state = pagerState,

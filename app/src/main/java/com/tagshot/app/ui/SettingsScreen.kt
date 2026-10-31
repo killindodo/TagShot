@@ -3,6 +3,9 @@ package com.tagshot.app.ui
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,11 +31,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.Storage
@@ -67,6 +72,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -74,12 +80,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tagshot.app.R
 import com.tagshot.app.TagShotApp
 import com.tagshot.app.ui.components.bouncyClickable
 import com.tagshot.app.ui.components.glassBorder
+import com.tagshot.app.ui.theme.AccentPalette
 import com.tagshot.app.ui.theme.TagShotGradients
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -105,6 +113,10 @@ fun SettingsScreen(
     val gridColumns by viewModel.gridColumns.collectAsState()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
     val themeMode by viewModel.themeModeFlow.collectAsState()
+    val accentPaletteStr by viewModel.accentPaletteFlow.collectAsState()
+    val currentPalette = remember(accentPaletteStr) {
+        AccentPalette.fromNameOrDefault(accentPaletteStr)
+    }
     val viewingStyleStr by viewModel.viewingStyleFlow.collectAsState()
     val tagDisplaySizeStr by viewModel.tagDisplaySizeFlow.collectAsState()
     val showListFileSize by viewModel.showListFileSizeFlow.collectAsState()
@@ -223,6 +235,16 @@ fun SettingsScreen(
         HapticsCard(
             enabled = hapticsEnabled,
             onToggle = { viewModel.setHapticsEnabled(!hapticsEnabled) }
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- Accent Theme & Palettes Section ---
+        SectionHeader(title = "ACCENT THEME & PALETTES")
+        AccentPaletteSelectorCard(
+            selectedPalette = currentPalette,
+            onSelectPalette = { palette: AccentPalette -> viewModel.setAccentPalette(palette) },
+            hapticsEnabled = hapticsEnabled
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -812,6 +834,210 @@ private fun HapticsCard(
                 )
             )
         }
+    }
+}
+
+@Composable
+private fun AccentPaletteSelectorCard(
+    selectedPalette: AccentPalette,
+    onSelectPalette: (AccentPalette) -> Unit,
+    hapticsEnabled: Boolean
+) {
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassBorder(shape = RoundedCornerShape(18.dp))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Palette,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Accent Engine",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = selectedPalette.shortName.uppercase(),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        ),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Text(
+                text = "Dynamic aerospace colorways with real-time reactive theme engine",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp, bottom = 14.dp)
+            )
+
+            // 6 Circular Color Swatches Row
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                AccentPalette.entries.forEach { palette ->
+                    val isSelected = palette == selectedPalette
+                    AccentSwatchItem(
+                        palette = palette,
+                        isSelected = isSelected,
+                        onClick = { onSelectPalette(palette) },
+                        hapticsEnabled = hapticsEnabled
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Active Palette Info Banner
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .glassBorder(
+                        shape = RoundedCornerShape(12.dp),
+                        strokeWidth = 0.5.dp,
+                        highlightColor = selectedPalette.primaryColor.copy(alpha = 0.35f)
+                    )
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(selectedPalette.primaryColor)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = selectedPalette.title,
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "• ${selectedPalette.subtitle}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccentSwatchItem(
+    palette: AccentPalette,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    hapticsEnabled: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    val ringColor by animateColorAsState(
+        targetValue = if (isSelected) palette.primaryColor else Color.Transparent,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "swatchRingColor"
+    )
+
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.08f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "swatchScale"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .scale(scale)
+            .bouncyClickable(
+                hapticsEnabled = hapticsEnabled,
+                onClick = {
+                    if (hapticsEnabled) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                    onClick()
+                }
+            )
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .border(
+                    width = if (isSelected) 2.5.dp else 1.dp,
+                    color = if (isSelected) ringColor else Color.White.copy(alpha = 0.12f),
+                    shape = CircleShape
+                )
+                .padding(3.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(
+                        brush = Brush.linearGradient(
+                            listOf(
+                                palette.primaryColor,
+                                palette.secondaryColor
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = if (palette == AccentPalette.OBSIDIAN_MONO) Color(0xFF0F172A) else Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = palette.shortName,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 10.sp,
+                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium
+            ),
+            color = if (isSelected) palette.primaryColor else MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }
 

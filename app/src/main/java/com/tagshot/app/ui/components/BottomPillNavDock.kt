@@ -2,6 +2,7 @@ package com.tagshot.app.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -53,8 +56,9 @@ private val NAV_ITEMS = listOf(
 
 /**
  * Specialist-grade floating glassmorphic pill navigation dock.
- * Features 28.dp frosted glass capsule contours, spring-animated active pill
- * indicators, and tactile bouncy press feedback.
+ * Features 28.dp frosted glass capsule contours, ambient neon underglow
+ * matching the active theme accent (MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+ * a smooth spring-animated sliding pill indicator between tabs, and tactile bouncy feedback.
  */
 @Composable
 fun BottomPillNavDock(
@@ -64,105 +68,162 @@ fun BottomPillNavDock(
     hapticsEnabled: Boolean = true
 ) {
     val capsuleShape = RoundedCornerShape(28.dp)
+    val itemShape = RoundedCornerShape(22.dp)
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val neonUnderglowColor = primaryColor.copy(alpha = 0.25f)
+
+    val activeIndex = NAV_ITEMS.indexOfFirst { it.tab == activeTab }.coerceAtLeast(0)
 
     Box(
-        modifier = modifier
-            .shadow(
-                elevation = 18.dp,
-                shape = capsuleShape,
-                spotColor = Color.Black.copy(alpha = 0.55f),
-                ambientColor = Color.Black.copy(alpha = 0.25f)
-            )
-            .clip(capsuleShape)
-            .background(TagShotGradients.cardGlassSurface)
-            .glassBorder(
-                shape = capsuleShape,
-                strokeWidth = 1.dp,
-                highlightColor = Color.White.copy(alpha = 0.20f),
-                shadowColor = Color.White.copy(alpha = 0.04f)
-            )
-            .padding(horizontal = 6.dp, vertical = 6.dp)
+        modifier = modifier,
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier.width(300.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            NAV_ITEMS.forEach { item ->
-                val isSelected = activeTab == item.tab
-
-                val indicatorBg by animateColorAsState(
-                    targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                    } else {
-                        Color.Transparent
-                    },
-                    animationSpec = tween(durationMillis = 200),
-                    label = "dockIndicatorBg"
+        // Ambient neon underglow layer matching primary accent
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .shadow(
+                    elevation = 22.dp,
+                    shape = capsuleShape,
+                    spotColor = primaryColor.copy(alpha = 0.70f),
+                    ambientColor = neonUnderglowColor
                 )
-
-                val indicatorBorder by animateColorAsState(
-                    targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.40f)
-                    } else {
-                        Color.Transparent
-                    },
-                    animationSpec = tween(durationMillis = 200),
-                    label = "dockIndicatorBorder"
-                )
-
-                val iconScale by animateFloatAsState(
-                    targetValue = if (isSelected) 1.12f else 1.0f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            neonUnderglowColor,
+                            primaryColor.copy(alpha = 0.08f),
+                            Color.Transparent
+                        )
                     ),
-                    label = "dockIconScale"
+                    shape = capsuleShape
                 )
+        )
 
-                val contentColor by animateColorAsState(
-                    targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-                    },
-                    animationSpec = tween(durationMillis = 180),
-                    label = "dockContentColor"
+        // Frosted glass capsule dock frame
+        Box(
+            modifier = Modifier
+                .shadow(
+                    elevation = 18.dp,
+                    shape = capsuleShape,
+                    spotColor = Color.Black.copy(alpha = 0.55f),
+                    ambientColor = neonUnderglowColor
                 )
+                .clip(capsuleShape)
+                .background(TagShotGradients.cardGlassSurface)
+                .glassBorder(
+                    shape = capsuleShape,
+                    strokeWidth = 1.dp,
+                    highlightColor = Color.White.copy(alpha = 0.20f),
+                    shadowColor = primaryColor.copy(alpha = 0.15f)
+                )
+                .padding(horizontal = 6.dp, vertical = 6.dp)
+        ) {
+            val totalInnerWidth = 300.dp
+            val tabCount = NAV_ITEMS.size
+            val indicatorWidth = totalInnerWidth / tabCount
 
-                val itemShape = RoundedCornerShape(22.dp)
+            // Smooth animated sliding pill offset with spring bounce physics
+            val animatedIndicatorOffset by animateDpAsState(
+                targetValue = indicatorWidth * activeIndex,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                label = "dockSlidingPillOffset"
+            )
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
+            Box(
+                modifier = Modifier.width(totalInnerWidth),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                // Animated sliding pill indicator with luminous specular gradient
+                Box(
                     modifier = Modifier
-                        .weight(1f)
+                        .offset(x = animatedIndicatorOffset)
+                        .width(indicatorWidth)
                         .height(48.dp)
                         .clip(itemShape)
-                        .background(indicatorBg)
-                        .border(1.dp, indicatorBorder, itemShape)
-                        .bouncyClickable(
-                            scaleDownFactor = 0.92f,
-                            hapticsEnabled = hapticsEnabled,
-                            onClick = { onTabSelected(item.tab) }
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    primaryColor.copy(alpha = 0.24f),
+                                    primaryColor.copy(alpha = 0.10f)
+                                )
+                            )
                         )
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    primaryColor.copy(alpha = 0.55f),
+                                    primaryColor.copy(alpha = 0.18f)
+                                )
+                            ),
+                            shape = itemShape
+                        )
+                )
+
+                // Tab buttons row
+                Row(
+                    modifier = Modifier.width(totalInnerWidth),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = item.icon,
-                        contentDescription = null,
-                        tint = contentColor,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .scale(iconScale)
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = item.title,
-                        fontSize = 11.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = contentColor,
-                        maxLines = 1
-                    )
+                    NAV_ITEMS.forEach { item ->
+                        val isSelected = activeTab == item.tab
+
+                        val iconScale by animateFloatAsState(
+                            targetValue = if (isSelected) 1.15f else 1.0f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "dockIconScale"
+                        )
+
+                        val contentColor by animateColorAsState(
+                            targetValue = if (isSelected) {
+                                primaryColor
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                            },
+                            animationSpec = tween(durationMillis = 180),
+                            label = "dockContentColor"
+                        )
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .clip(itemShape)
+                                .bouncyClickable(
+                                    scaleDownFactor = 0.92f,
+                                    hapticsEnabled = hapticsEnabled,
+                                    onClick = { onTabSelected(item.tab) }
+                                )
+                        ) {
+                            Icon(
+                                imageVector = item.icon,
+                                contentDescription = item.title,
+                                tint = contentColor,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .scale(iconScale)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = item.title,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = contentColor,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
         }

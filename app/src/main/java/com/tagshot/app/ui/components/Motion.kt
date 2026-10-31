@@ -33,6 +33,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.LaunchedEffect
 
 /**
  * Tactile spring scale modifier with integrated haptic feedback.
@@ -85,32 +87,7 @@ fun Modifier.bouncyClickable(
 /**
  * Animated shimmer effect for image placeholders and skeleton states.
  */
-fun Modifier.shimmerEffect(): Modifier = composed {
-    val transition = rememberInfiniteTransition(label = "shimmerTransition")
-    val translateAnim by transition.animateFloat(
-        initialValue = -500f,
-        targetValue = 1500f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1300, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmerTranslate"
-    )
-
-    val shimmerColors = listOf(
-        Color(0xFF1E2631),
-        Color(0xFF2E3A4B),
-        Color(0xFF1E2631)
-    )
-
-    val brush = Brush.linearGradient(
-        colors = shimmerColors,
-        start = Offset(translateAnim - 400f, translateAnim - 400f),
-        end = Offset(translateAnim, translateAnim)
-    )
-
-    this.background(brush)
-}
+fun Modifier.shimmerEffect(): Modifier = this.shimmerPlaceholder(visible = true)
 
 /**
  * Frosted glass border styling with subtle specular highlight gradient.
@@ -127,3 +104,42 @@ fun Modifier.glassBorder(
     ),
     shape = shape
 )
+
+/**
+ * Smooth pop-in spring entrance modifier for modal dialogs and overlay surfaces.
+ * Uses [Spring.DampingRatioMediumBouncy] or [Spring.DampingRatioLowBouncy] for Apple-grade tactile feedback.
+ */
+fun Modifier.springDialogEntrance(
+    dampingRatio: Float = Spring.DampingRatioMediumBouncy,
+    stiffness: Float = Spring.StiffnessMediumLow
+): Modifier = composed {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+
+    val animatedScale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.88f,
+        animationSpec = spring(
+            dampingRatio = dampingRatio,
+            stiffness = stiffness
+        ),
+        label = "dialogSpringScale"
+    )
+
+    val animatedAlpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "dialogSpringAlpha"
+    )
+
+    this.graphicsLayer {
+        scaleX = animatedScale
+        scaleY = animatedScale
+        alpha = animatedAlpha
+    }
+}
+

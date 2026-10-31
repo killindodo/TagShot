@@ -8,6 +8,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -31,10 +34,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -95,6 +101,7 @@ import coil.request.ImageRequest
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -102,10 +109,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.core.content.FileProvider
 import com.tagshot.app.domain.SortOrder
+import com.tagshot.app.domain.TagMatchMode
 import com.tagshot.app.ui.components.BottomPillNavDock
+import com.tagshot.app.ui.components.FastScrollScrubber
 import com.tagshot.app.ui.components.PhotoCell
+import com.tagshot.app.ui.components.StickyTimelineHeaderOverlay
 import com.tagshot.app.ui.components.TagDisplaySize
 import com.tagshot.app.ui.components.WindowsDetailsRow
+import com.tagshot.app.ui.components.pinchZoomGrid
 import java.io.File
 import java.util.UUID
 
@@ -135,12 +146,22 @@ fun MainScreen(
     }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val currentTab = (uiState as? MainUiState.Success)?.activeTab ?: MainTab.ALL_PHOTOS
-    val isInSelectionMode = selectedPhotoIds.isNotEmpty()
-    val isInsideFolder = (uiState as? MainUiState.Success)?.let {
-        it.activeTab == MainTab.FOLDER_WISE && it.selectedFolder.isNotEmpty()
-    } == true
-    val isSettingsTab = currentTab == MainTab.SETTINGS
+    val currentTab by remember(uiState) {
+        derivedStateOf { (uiState as? MainUiState.Success)?.activeTab ?: MainTab.ALL_PHOTOS }
+    }
+    val isInSelectionMode by remember {
+        derivedStateOf { selectedPhotoIds.isNotEmpty() }
+    }
+    val isInsideFolder by remember(uiState) {
+        derivedStateOf {
+            (uiState as? MainUiState.Success)?.let {
+                it.activeTab == MainTab.FOLDER_WISE && it.selectedFolder.isNotEmpty()
+            } == true
+        }
+    }
+    val isSettingsTab by remember(currentTab) {
+        derivedStateOf { currentTab == MainTab.SETTINGS }
+    }
 
     // Back button exits selection mode first per Section 9.1; if inside folder, returns to folders list; if on settings, returns to gallery
     BackHandler(enabled = isInSelectionMode || isInsideFolder || isSettingsTab) {
@@ -399,6 +420,9 @@ fun MainScreen(
                                                 if (!isInSelectionMode) {
                                                     viewModel.enterSelection(id)
                                                 }
+                                            },
+                                            onColumnsChange = { newCols ->
+                                                viewModel.setGridColumns(newCols)
                                             }
                                         )
                                     }
@@ -436,6 +460,9 @@ fun MainScreen(
                                             if (!isInSelectionMode) {
                                                 viewModel.enterSelection(id)
                                             }
+                                        },
+                                        onColumnsChange = { newCols ->
+                                            viewModel.setGridColumns(newCols)
                                         }
                                     )
                                 }
@@ -748,7 +775,9 @@ private fun TagChipsRow(
 ) {
     val selectedIds = state.filterState.selectedTagIds
     val untaggedOnly = state.filterState.untaggedOnly
-    val isAllSelected = selectedIds.isEmpty() && !untaggedOnly
+    val isAllSelected by remember(selectedIds, untaggedOnly) {
+        derivedStateOf { selectedIds.isEmpty() && !untaggedOnly }
+    }
 
     LazyRow(
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
@@ -785,6 +814,20 @@ private fun TagChipsRow(
                 onClick = { viewModel.onTagChipToggled(tag.id) },
                 label = { Text("#${tag.name} (${tag.photoCount})") }
             )
+        }
+
+        // Multi-Tag Match Mode Toggle Chip (ANY vs ALL)
+        if (selectedIds.size > 1) {
+            item(key = "chip_match_mode") {
+                val isAllMode = state.filterState.matchMode == TagMatchMode.ALL
+                FilterChip(
+                    selected = true,
+                    onClick = { viewModel.toggleTagMatchMode() },
+                    label = {
+                        Text(if (isAllMode) "Match: ALL (AND)" else "Match: ANY (OR)")
+                    }
+                )
+            }
         }
     }
 }
@@ -1057,6 +1100,7 @@ private fun sharePhotos(context: android.content.Context, relativePaths: List<St
     context.startActivity(Intent.createChooser(intent, "Share Photo(s)"))
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun PhotoCollectionView(
     photos: List<com.tagshot.app.data.PhotoWithTags>,
@@ -1070,87 +1114,164 @@ private fun PhotoCollectionView(
     isInSelectionMode: Boolean,
     onPhotoClick: (Long) -> Unit,
     onPhotoLongClick: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onColumnsChange: ((Int) -> Unit)? = null
 ) {
-    when (viewingStyle) {
-        ViewingStyle.GRID -> {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(gridColumns),
-                contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 96.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = modifier.fillMaxSize()
-            ) {
-                items(
-                    items = photos,
-                    key = { it.photo.id },
-                    contentType = { "photo_grid" }
-                ) { item ->
-                    PhotoCell(
-                        photoWithTags = item,
-                        isSelected = selectedPhotoIds.contains(item.photo.id),
-                        isInSelectionMode = isInSelectionMode,
-                        tagDisplaySize = tagDisplaySize,
-                        aspectRatio = 1f,
-                        onClick = { onPhotoClick(item.photo.id) },
-                        onLongClick = { onPhotoLongClick(item.photo.id) }
-                    )
-                }
-            }
-        }
-        ViewingStyle.LIST_DETAILS -> {
-            LazyColumn(
-                contentPadding = PaddingValues(start = 10.dp, top = 8.dp, end = 10.dp, bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = modifier.fillMaxSize()
-            ) {
-                items(
-                    items = photos,
-                    key = { it.photo.id },
-                    contentType = { "photo_list" }
-                ) { item ->
-                    WindowsDetailsRow(
-                        photoWithTags = item,
-                        isSelected = selectedPhotoIds.contains(item.photo.id),
-                        isInSelectionMode = isInSelectionMode,
-                        tagDisplaySize = tagDisplaySize,
-                        showFileSize = showListFileSize,
-                        showDate = showListDate,
-                        showFolder = showListFolder,
-                        onClick = { onPhotoClick(item.photo.id) },
-                        onLongClick = { onPhotoLongClick(item.photo.id) }
-                    )
-                }
-            }
-        }
-        ViewingStyle.MASONRY -> {
-            LazyVerticalStaggeredGrid(
-                columns = StaggeredGridCells.Fixed(gridColumns),
-                contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 96.dp),
-                verticalItemSpacing = 6.dp,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = modifier.fillMaxSize()
-            ) {
-                items(
-                    items = photos,
-                    key = { it.photo.id },
-                    contentType = { "photo_masonry" }
-                ) { item ->
-                    val ratio = remember(item.photo.width, item.photo.height) {
-                        if (item.photo.width > 0 && item.photo.height > 0) {
-                            (item.photo.width.toFloat() / item.photo.height.toFloat()).coerceIn(0.65f, 1.5f)
-                        } else {
-                            1f
+    val pinchModifier = if (onColumnsChange != null) {
+        Modifier.pinchZoomGrid(
+            currentColumns = gridColumns,
+            onColumnsChange = onColumnsChange
+        )
+    } else {
+        Modifier
+    }
+
+    Crossfade(
+        targetState = viewingStyle,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
+        label = "viewingStyleTransition",
+        modifier = modifier.then(pinchModifier)
+    ) { currentViewingStyle ->
+        when (currentViewingStyle) {
+            ViewingStyle.GRID -> {
+                val gridState = rememberLazyGridState()
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Fixed(gridColumns),
+                        contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 96.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(
+                            items = photos,
+                            key = { it.photo.id },
+                            contentType = { "photo_grid" }
+                        ) { item ->
+                            PhotoCell(
+                                photoWithTags = item,
+                                isSelected = selectedPhotoIds.contains(item.photo.id),
+                                isInSelectionMode = isInSelectionMode,
+                                tagDisplaySize = tagDisplaySize,
+                                aspectRatio = 1f,
+                                onClick = { onPhotoClick(item.photo.id) },
+                                onLongClick = { onPhotoLongClick(item.photo.id) },
+                                modifier = Modifier.animateItemPlacement(
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    )
+                                )
+                            )
                         }
                     }
-                    PhotoCell(
-                        photoWithTags = item,
-                        isSelected = selectedPhotoIds.contains(item.photo.id),
-                        isInSelectionMode = isInSelectionMode,
-                        tagDisplaySize = tagDisplaySize,
-                        aspectRatio = ratio,
-                        onClick = { onPhotoClick(item.photo.id) },
-                        onLongClick = { onPhotoLongClick(item.photo.id) }
+
+                    // Floating sticky timeline header pill
+                    StickyTimelineHeaderOverlay(
+                        gridState = gridState,
+                        photos = photos,
+                        modifier = Modifier.align(Alignment.TopCenter)
+                    )
+
+                    // Interactive fast-scroll scrubber with Month/Year magnifier bubble
+                    FastScrollScrubber(
+                        gridState = gridState,
+                        photos = photos,
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                    )
+                }
+            }
+            ViewingStyle.LIST_DETAILS -> {
+                val listState = rememberLazyListState()
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = listState,
+                        contentPadding = PaddingValues(start = 10.dp, top = 8.dp, end = 10.dp, bottom = 96.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(
+                            items = photos,
+                            key = { it.photo.id },
+                            contentType = { "photo_list" }
+                        ) { item ->
+                            WindowsDetailsRow(
+                                photoWithTags = item,
+                                isSelected = selectedPhotoIds.contains(item.photo.id),
+                                isInSelectionMode = isInSelectionMode,
+                                tagDisplaySize = tagDisplaySize,
+                                showFileSize = showListFileSize,
+                                showDate = showListDate,
+                                showFolder = showListFolder,
+                                onClick = { onPhotoClick(item.photo.id) },
+                                onLongClick = { onPhotoLongClick(item.photo.id) }
+                            )
+                        }
+                    }
+
+                    // Floating sticky timeline header pill
+                    StickyTimelineHeaderOverlay(
+                        listState = listState,
+                        photos = photos,
+                        modifier = Modifier.align(Alignment.TopCenter)
+                    )
+
+                    // Interactive fast-scroll scrubber with Month/Year magnifier bubble
+                    FastScrollScrubber(
+                        listState = listState,
+                        photos = photos,
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                    )
+                }
+            }
+            ViewingStyle.MASONRY -> {
+                val staggeredGridState = rememberLazyStaggeredGridState()
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyVerticalStaggeredGrid(
+                        state = staggeredGridState,
+                        columns = StaggeredGridCells.Fixed(gridColumns),
+                        contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 96.dp),
+                        verticalItemSpacing = 6.dp,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(
+                            items = photos,
+                            key = { it.photo.id },
+                            contentType = { "photo_masonry" }
+                        ) { item ->
+                            val ratio = remember(item.photo.width, item.photo.height) {
+                                if (item.photo.width > 0 && item.photo.height > 0) {
+                                    (item.photo.width.toFloat() / item.photo.height.toFloat()).coerceIn(0.65f, 1.5f)
+                                } else {
+                                    1f
+                                }
+                            }
+                            PhotoCell(
+                                photoWithTags = item,
+                                isSelected = selectedPhotoIds.contains(item.photo.id),
+                                isInSelectionMode = isInSelectionMode,
+                                tagDisplaySize = tagDisplaySize,
+                                aspectRatio = ratio,
+                                onClick = { onPhotoClick(item.photo.id) },
+                                onLongClick = { onPhotoLongClick(item.photo.id) }
+                            )
+                        }
+                    }
+
+                    // Floating sticky timeline header pill
+                    StickyTimelineHeaderOverlay(
+                        staggeredGridState = staggeredGridState,
+                        photos = photos,
+                        modifier = Modifier.align(Alignment.TopCenter)
+                    )
+
+                    // Interactive fast-scroll scrubber with Month/Year magnifier bubble
+                    FastScrollScrubber(
+                        staggeredGridState = staggeredGridState,
+                        photos = photos,
+                        modifier = Modifier.align(Alignment.CenterEnd)
                     )
                 }
             }

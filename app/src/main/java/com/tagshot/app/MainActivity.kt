@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -24,6 +25,7 @@ import com.tagshot.app.ui.MainScreen
 import com.tagshot.app.ui.PhotoDetailScreen
 import com.tagshot.app.ui.PhotoViewModel
 import com.tagshot.app.ui.TagManagerScreen
+import com.tagshot.app.ui.theme.AccentPalette
 import com.tagshot.app.ui.theme.TagShotTheme
 
 class MainActivity : ComponentActivity() {
@@ -44,12 +46,19 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val themeMode by viewModel.themeModeFlow.collectAsState()
+            val accentPaletteStr by viewModel.accentPaletteFlow.collectAsState()
+            val accentPalette = remember(accentPaletteStr) {
+                AccentPalette.fromNameOrDefault(accentPaletteStr)
+            }
             val isDarkTheme = when (themeMode) {
                 "DARK" -> true
                 "LIGHT" -> false
                 else -> androidx.compose.foundation.isSystemInDarkTheme()
             }
-            TagShotTheme(darkTheme = isDarkTheme) {
+            TagShotTheme(
+                darkTheme = isDarkTheme,
+                accentPalette = accentPalette
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

@@ -11,6 +11,7 @@ import com.tagshot.app.data.SingleImportResult
 import com.tagshot.app.data.TagEntity
 import com.tagshot.app.data.TagWithCount
 import com.tagshot.app.domain.SortOrder
+import com.tagshot.app.domain.TagMatchMode
 import com.tagshot.app.domain.TagResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -752,5 +753,67 @@ class PhotoViewModelTest {
         // Toggle folder
         viewModel.setShowListFolder(false)
         assertFalse(viewModel.showListFolderFlow.value)
+    }
+
+    @Test
+    fun testTagMatchModeAnyVsAll() = runTest(testDispatcher) {
+        val tagA = TagEntity(id = 10L, name = "Landscape", normalizedName = "landscape")
+        val tagB = TagEntity(id = 20L, name = "Sunset", normalizedName = "sunset")
+        val tagC = TagEntity(id = 30L, name = "Portrait", normalizedName = "portrait")
+
+        val p1 = PhotoWithTags(
+            photo = PhotoEntity(id = 1L, originalPath = "p1.jpg", thumbPath = "p1_th.jpg", sha256 = "111", mimeType = "image/jpeg", width = 100, height = 100, sizeBytes = 1000, addedAt = 1000L, takenAt = null),
+            tags = listOf(tagA, tagB) // Has BOTH 10 and 20
+        )
+        val p2 = PhotoWithTags(
+            photo = PhotoEntity(id = 2L, originalPath = "p2.jpg", thumbPath = "p2_th.jpg", sha256 = "222", mimeType = "image/jpeg", width = 100, height = 100, sizeBytes = 1000, addedAt = 2000L, takenAt = null),
+            tags = listOf(tagB) // Has ONLY 20
+        )
+        val p3 = PhotoWithTags(
+            photo = PhotoEntity(id = 3L, originalPath = "p3.jpg", thumbPath = "p3_th.jpg", sha256 = "333", mimeType = "image/jpeg", width = 100, height = 100, sizeBytes = 1000, addedAt = 3000L, takenAt = null),
+            tags = listOf(tagC) // Has ONLY 30
+        )
+
+        repository.photosFlow.value = listOf(p1, p2, p3)
+        repository.tagsFlow.value = listOf(
+            TagWithCount(id = 10L, name = "Landscape", normalizedName = "landscape", photoCount = 1),
+            TagWithCount(id = 20L, name = "Sunset", normalizedName = "sunset", photoCount = 2),
+            TagWithCount(id = 30L, name = "Portrait", normalizedName = "portrait", photoCount = 1)
+        )
+
+        val handle = SavedStateHandle()
+        val viewModel = PhotoViewModel(repository, handle, testDispatcher)
+
+        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        // Select both tags 10L and 20L
+        viewModel.onTagChipToggled(10L)
+        viewModel.onTagChipToggled(20L)
+        advanceUntilIdle()
+
+        // Default mode is ANY -> should match p1 and p2 (both have at least one of 10L or 20L)
+        assertEquals(TagMatchMode.ANY.name, viewModel.tagMatchModeFlow.value)
+        var state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(2, state.photos.size)
+        assertTrue(state.photos.any { it.photo.id == 1L })
+        assertTrue(state.photos.any { it.photo.id == 2L })
+
+        // Switch to ALL mode -> should match only p1 (contains both 10L AND 20L)
+        viewModel.setTagMatchMode(TagMatchMode.ALL)
+        advanceUntilIdle()
+        state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(1, state.photos.size)
+        assertEquals(1L, state.photos[0].photo.id)
+
+        // Toggle back to ANY mode
+        viewModel.toggleTagMatchMode()
+        advanceUntilIdle()
+        state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(2, state.photos.size)
+
+        collectJob.cancel()
     }
 }

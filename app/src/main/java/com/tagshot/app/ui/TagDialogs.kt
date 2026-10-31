@@ -31,6 +31,7 @@ import com.tagshot.app.domain.Limits
 import com.tagshot.app.domain.ParseResult
 import com.tagshot.app.domain.TagParser
 import com.tagshot.app.ui.components.TagBadge
+import com.tagshot.app.ui.components.springDialogEntrance
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -61,6 +62,7 @@ fun TagInputDialog(
     }
 
     AlertDialog(
+        modifier = Modifier.springDialogEntrance(),
         onDismissRequest = onDismiss,
         title = { Text(text = title) },
         text = {
@@ -162,6 +164,7 @@ fun ConfirmDeleteDialog(
     onConfirm: () -> Unit
 ) {
     AlertDialog(
+        modifier = Modifier.springDialogEntrance(),
         onDismissRequest = onDismiss,
         title = { Text("Delete Photos") },
         text = {
@@ -191,6 +194,7 @@ fun RemoveTagFromSelectedDialog(
     onTagSelected: (tagId: Long) -> Unit
 ) {
     AlertDialog(
+        modifier = Modifier.springDialogEntrance(),
         onDismissRequest = onDismiss,
         title = { Text("Remove Tag from Selected") },
         text = {

@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
 import coil.size.Precision
 import com.tagshot.app.data.PhotoWithTags
@@ -54,8 +56,9 @@ import com.tagshot.app.ui.theme.TagShotGradients
 import java.io.File
 
 /**
- * Specialist-grade PhotoCell featuring tactile spring bounce,
- * bottom vignette scrim, micro-capsule tag pills, and animated selection states.
+ * Specialist-grade PhotoCell featuring progressive shimmer skeleton loading,
+ * tactile spring bounce, bottom vignette scrim, micro-capsule tag pills,
+ * and animated selection states without blank flashes or stutter.
  */
 @Composable
 fun PhotoCell(
@@ -73,11 +76,18 @@ fun PhotoCell(
         File(context.filesDir, photoWithTags.photo.thumbPath)
     }
     var isError by remember(photoWithTags.photo.id) { mutableStateOf(false) }
+    var isLoading by remember(photoWithTags.photo.id) { mutableStateOf(true) }
 
-    val tagDescriptions = if (photoWithTags.tags.isEmpty()) {
-        "untagged"
-    } else {
-        photoWithTags.tags.joinToString(", ") { it.name }
+    val hasTags by remember(photoWithTags.tags) {
+        derivedStateOf { photoWithTags.tags.isNotEmpty() }
+    }
+
+    val tagDescriptions = remember(photoWithTags.tags) {
+        if (photoWithTags.tags.isEmpty()) {
+            "untagged"
+        } else {
+            photoWithTags.tags.joinToString(", ") { it.name }
+        }
     }
     val cellDescription = "Photo, tags: $tagDescriptions"
 
@@ -134,24 +144,54 @@ fun PhotoCell(
                 )
             }
         } else {
+            // Progressive Apple-grade shimmer skeleton while Coil decodes/loads thumbnail
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .shimmerPlaceholder(visible = true, shape = cellShape)
+                )
+            }
+
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(thumbFile)
-                    .crossfade(true)
+                    .crossfade(180)
                     .size(512)
                     .precision(Precision.EXACT)
                     .listener(
-                        onError = { _, _ -> isError = true }
+                        onSuccess = { _, _ -> isLoading = false },
+                        onError = { _, _ ->
+                            isLoading = false
+                            isError = true
+                        }
                     )
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                onState = { state ->
+                    when (state) {
+                        is AsyncImagePainter.State.Success -> {
+                            isLoading = false
+                        }
+                        is AsyncImagePainter.State.Error -> {
+                            isLoading = false
+                            isError = true
+                        }
+                        is AsyncImagePainter.State.Loading -> {
+                            isLoading = true
+                        }
+                        is AsyncImagePainter.State.Empty -> {
+                            // Initial state before load starts
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             )
         }
 
         // Bottom Vignette Gradient Scrim for crisp badge legibility
-        if (photoWithTags.tags.isNotEmpty()) {
+        if (hasTags) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)

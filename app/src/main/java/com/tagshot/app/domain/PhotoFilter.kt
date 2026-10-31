@@ -3,6 +3,11 @@ package com.tagshot.app.domain
 import java.text.Normalizer
 import java.util.Locale
 
+enum class TagMatchMode {
+    ANY,
+    ALL
+}
+
 data class FilterPhoto(
     val id: Long,
     val normalizedTags: Set<String>,
@@ -12,7 +17,8 @@ data class FilterPhoto(
 data class FilterState(
     val query: String = "",
     val selectedTagIds: Set<Long> = emptySet(),
-    val untaggedOnly: Boolean = false
+    val untaggedOnly: Boolean = false,
+    val matchMode: TagMatchMode = TagMatchMode.ANY
 )
 
 object PhotoFilter {
@@ -48,12 +54,53 @@ object PhotoFilter {
     }
 
     /**
-     * Tests if a photo contains all selected tag IDs:
-     * selectedTagIds ⊆ photo.tagIds
+     * Tests if a photo matches selected tag IDs according to [matchMode]:
+     * - When [TagMatchMode.ANY]: matches photos with at least one selected tag.
+     * - When [TagMatchMode.ALL]: matches photos containing EVERY selected tag.
+     * (Empty selectedTagIds yields true).
      */
-    fun matchChips(photo: FilterPhoto, selectedTagIds: Set<Long>): Boolean {
+    fun matchChips(
+        photo: FilterPhoto,
+        selectedTagIds: Set<Long>,
+        matchMode: TagMatchMode = TagMatchMode.ANY
+    ): Boolean {
         if (selectedTagIds.isEmpty()) return true
-        return photo.tagIds.containsAll(selectedTagIds)
+        return when (matchMode) {
+            TagMatchMode.ANY -> photo.tagIds.any { selectedTagIds.contains(it) }
+            TagMatchMode.ALL -> photo.tagIds.containsAll(selectedTagIds)
+        }
+    }
+
+    /**
+     * Filters photos by tag IDs and untagged criteria according to [matchMode].
+     * - When [TagMatchMode.ANY]: matches photos with at least one selected tag.
+     * - When [TagMatchMode.ALL]: matches photos containing EVERY selected tag.
+     */
+    fun filterByTags(
+        photos: List<FilterPhoto>,
+        tagIds: Set<Long>,
+        untaggedOnly: Boolean = false,
+        matchMode: TagMatchMode = TagMatchMode.ANY
+    ): List<FilterPhoto> {
+        return photos.filter { photo ->
+            matchUntagged(photo, untaggedOnly) && matchChips(photo, tagIds, matchMode)
+        }
+    }
+
+    /**
+     * Generic overload of [filterByTags] allowing any item type with a mapper function.
+     */
+    fun <T> filterByTags(
+        photos: List<T>,
+        tagIds: Set<Long>,
+        untaggedOnly: Boolean = false,
+        matchMode: TagMatchMode = TagMatchMode.ANY,
+        toFilterPhoto: (T) -> FilterPhoto
+    ): List<T> {
+        return photos.filter { item ->
+            val photo = toFilterPhoto(item)
+            matchUntagged(photo, untaggedOnly) && matchChips(photo, tagIds, matchMode)
+        }
     }
 
     /**
@@ -66,11 +113,11 @@ object PhotoFilter {
 
     /**
      * Evaluates total visibility predicate:
-     * visible(p) = matchText(p) ∧ matchChips(p) ∧ matchUntagged(p)
+     * visible(p) = matchText(p) ∧ matchChips(p, matchMode) ∧ matchUntagged(p)
      */
     fun matches(photo: FilterPhoto, tokens: List<String>, state: FilterState): Boolean {
         return matchText(photo, tokens) &&
-                matchChips(photo, state.selectedTagIds) &&
+                matchChips(photo, state.selectedTagIds, state.matchMode) &&
                 matchUntagged(photo, state.untaggedOnly)
     }
 
