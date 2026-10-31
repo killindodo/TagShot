@@ -12,6 +12,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,16 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
+import com.tagshot.app.R
+import com.tagshot.app.ui.components.bouncyClickable
+import com.tagshot.app.ui.components.glassBorder
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Label
@@ -77,7 +88,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -516,7 +526,7 @@ fun MainScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(bottom = 12.dp)
+                        .padding(bottom = 8.dp)
                 )
             }
         }
@@ -666,6 +676,53 @@ private fun SelectionTopBar(
     )
 }
 
+@Composable
+private fun GlassActionPillButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    isActive: Boolean = false,
+    hapticsEnabled: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val shape = RoundedCornerShape(13.dp)
+    val activeBg = primaryColor.copy(alpha = 0.18f)
+    val defaultBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
+    val activeBorder = primaryColor.copy(alpha = 0.45f)
+    val defaultBorder = Color.White.copy(alpha = 0.16f)
+
+    Box(
+        modifier = modifier
+            .size(42.dp)
+            .clip(shape)
+            .background(if (isActive) activeBg else defaultBg)
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    listOf(
+                        if (isActive) activeBorder else defaultBorder,
+                        Color.Transparent
+                    )
+                ),
+                shape = shape
+            )
+            .bouncyClickable(
+                scaleDownFactor = 0.88f,
+                hapticsEnabled = hapticsEnabled,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (isActive) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainTopBar(
@@ -675,6 +732,7 @@ private fun MainTopBar(
 ) {
     val query by viewModel.queryFlow.collectAsState()
     val sortOrderName by viewModel.sortOrderFlow.collectAsState()
+    val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
     var showSortMenu by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
 
@@ -684,33 +742,103 @@ private fun MainTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { viewModel.onQueryChanged(it) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                trailingIcon = {
+            // Liquid Frosted Glass Capsule Search Widget
+            val searchShape = RoundedCornerShape(21.dp)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(42.dp)
+                    .clip(searchShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f))
+                    .glassBorder(
+                        shape = searchShape,
+                        strokeWidth = 1.dp,
+                        highlightColor = Color.White.copy(alpha = 0.18f),
+                        shadowColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                    )
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_sf_search),
+                        contentDescription = "Search",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { viewModel.onQueryChanged(it) },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 14.sp
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.weight(1f),
+                        decorationBox = { innerTextField ->
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                if (query.isEmpty()) {
+                                    Text(
+                                        text = "Search photos, tags...",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.60f),
+                                            fontSize = 14.sp
+                                        )
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
                     if (query.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.onQueryChanged("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f))
+                                .bouncyClickable(
+                                    scaleDownFactor = 0.85f,
+                                    hapticsEnabled = hapticsEnabled,
+                                    onClick = { viewModel.onQueryChanged("") }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Clear search",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(12.dp)
+                            )
                         }
                     }
-                },
-                placeholder = { Text("Search by tag...") },
-                singleLine = true,
-                modifier = Modifier.weight(1f)
-            )
+                }
+            }
 
             // Sort Menu Button
             Box {
-                IconButton(onClick = { showSortMenu = true }) {
-                    Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort options")
-                }
+                GlassActionPillButton(
+                    icon = Icons.AutoMirrored.Filled.Sort,
+                    contentDescription = "Sort options",
+                    isActive = showSortMenu || currentSort != SortOrder.NEWEST,
+                    hapticsEnabled = hapticsEnabled,
+                    onClick = { showSortMenu = true }
+                )
                 DropdownMenu(
                     expanded = showSortMenu,
                     onDismissRequest = { showSortMenu = false }
@@ -744,8 +872,6 @@ private fun MainTopBar(
 
             // Quick View Switcher Button
             val viewingStyleStr by viewModel.viewingStyleFlow.collectAsState()
-            val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
-            val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
             val viewingStyle = remember(viewingStyleStr) {
                 try { ViewingStyle.valueOf(viewingStyleStr) } catch (_: Exception) { ViewingStyle.GRID }
             }
@@ -759,25 +885,23 @@ private fun MainTopBar(
                 ViewingStyle.LIST_DETAILS -> "Windows Details List"
                 ViewingStyle.MASONRY -> "Masonry View"
             }
-            IconButton(
-                onClick = {
-                    if (hapticsEnabled) {
-                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                    }
-                    viewModel.cycleViewingStyle()
-                }
-            ) {
-                Icon(
-                    imageVector = viewIcon,
-                    contentDescription = "Switch viewing style (current: $viewLabel)"
-                )
-            }
+            GlassActionPillButton(
+                icon = viewIcon,
+                contentDescription = "Switch viewing style (current: $viewLabel)",
+                isActive = viewingStyle != ViewingStyle.GRID,
+                hapticsEnabled = hapticsEnabled,
+                onClick = { viewModel.cycleViewingStyle() }
+            )
 
-            // Overflow Menu
+            // Overflow Menu Button
             Box {
-                IconButton(onClick = { showOverflowMenu = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More options")
-                }
+                GlassActionPillButton(
+                    icon = Icons.Default.MoreVert,
+                    contentDescription = "More options",
+                    isActive = showOverflowMenu,
+                    hapticsEnabled = hapticsEnabled,
+                    onClick = { showOverflowMenu = true }
+                )
                 DropdownMenu(
                     expanded = showOverflowMenu,
                     onDismissRequest = { showOverflowMenu = false }

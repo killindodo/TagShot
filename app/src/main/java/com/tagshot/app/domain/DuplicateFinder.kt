@@ -91,16 +91,27 @@ object DuplicateFinder {
     }
 
     /**
-     * Reads a thumbnail file downsampled and calculates its 64-bit dHash.
+     * Reads a thumbnail or original photo file with safe downsampling and calculates its 64-bit dHash.
      */
     fun computeDHashFromFile(file: File): Long? {
         if (!file.exists() || file.length() == 0L) return null
         return try {
-            val options = BitmapFactory.Options().apply {
-                inPreferredConfig = Bitmap.Config.RGB_565
-                inSampleSize = 2
+            val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, boundsOpts)
+            val w = boundsOpts.outWidth
+            val h = boundsOpts.outHeight
+            if (w <= 0 || h <= 0) return null
+
+            var sample = 1
+            while ((w / sample) > 64 || (h / sample) > 64) {
+                sample *= 2
             }
-            val bitmap = BitmapFactory.decodeFile(file.absolutePath, options) ?: return null
+
+            val opts = BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath, opts) ?: return null
             val hash = computeDHash(bitmap)
             if (!bitmap.isRecycled) {
                 bitmap.recycle()
@@ -189,7 +200,7 @@ object DuplicateFinder {
     fun findClusters(
         photos: List<PhotoWithTags>,
         photoHashMap: Map<Long, Long>,
-        maxHammingDistance: Int = 5
+        maxHammingDistance: Int = 8
     ): List<DuplicateCluster> {
         if (photos.size < 2) return emptyList()
 
@@ -220,7 +231,33 @@ object DuplicateFinder {
             group.forEach { processedIds.add(it.photo.id) }
         }
 
-        // 2. Visual similarity matching via 64-bit dHash for remaining photos
+        // 2. Exact File Size & Resolution matches for remaining photos
+        val sizeGroups = photos.filter { it.photo.id !in processedIds && it.photo.sizeBytes > 0 }
+            .groupBy { "${it.photo.sizeBytes}_${it.photo.width}_${it.photo.height}" }
+            .filter { it.value.size > 1 }
+        for ((_, group) in sizeGroups) {
+            val sorted = group.sortedWith(
+                compareByDescending<PhotoWithTags> { it.tags.size }
+                    .thenByDescending { it.photo.takenAt ?: it.photo.addedAt }
+            )
+            val keep = sorted.first()
+            val duplicates = sorted.drop(1)
+            val reclaimable = duplicates.sumOf { it.photo.sizeBytes }
+
+            clusters.add(
+                DuplicateCluster(
+                    id = "size_${keep.photo.id}",
+                    keepPhoto = keep,
+                    duplicatePhotos = duplicates,
+                    matchType = DuplicateMatchType.EXACT_SIZE_NAME,
+                    reclaimableBytes = reclaimable,
+                    recommendationReason = "Identical file size (${keep.photo.sizeBytes / 1024}KB) & resolution (${keep.photo.width}x${keep.photo.height})"
+                )
+            )
+            group.forEach { processedIds.add(it.photo.id) }
+        }
+
+        // 3. Visual similarity matching via 64-bit dHash for remaining photos
         val remaining = photos.filter { it.photo.id !in processedIds }
         for (i in remaining.indices) {
             val photoA = remaining[i]

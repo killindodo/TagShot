@@ -159,6 +159,14 @@ fun SettingsScreen(
     val duplicateClusters by viewModel.duplicateClustersFlow.collectAsState()
     val isScanningDuplicates by viewModel.isScanningDuplicatesFlow.collectAsState()
     var showDecisionHubDialog by remember { mutableStateOf(false) }
+    var wasScanning by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isScanningDuplicates) {
+        if (wasScanning && !isScanningDuplicates && duplicateClusters.isNotEmpty()) {
+            showDecisionHubDialog = true
+        }
+        wasScanning = isScanningDuplicates
+    }
 
     val viewingStyle = remember(viewingStyleStr) {
         try { ViewingStyle.valueOf(viewingStyleStr) } catch (_: Exception) { ViewingStyle.GRID }

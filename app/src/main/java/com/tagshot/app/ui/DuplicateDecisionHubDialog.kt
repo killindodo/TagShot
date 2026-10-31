@@ -397,8 +397,16 @@ private fun PhotoComparisonCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val thumbFile = remember(photoWithTags.photo.thumbPath) {
-        File(context.filesDir, photoWithTags.photo.thumbPath)
+    val imageFile = remember(photoWithTags.photo.thumbPath, photoWithTags.photo.originalPath) {
+        val relThumb = File(context.filesDir, photoWithTags.photo.thumbPath)
+        val relOrig = File(context.filesDir, photoWithTags.photo.originalPath)
+        val absOrig = File(photoWithTags.photo.originalPath)
+        when {
+            relThumb.exists() && relThumb.length() > 0 -> relThumb
+            relOrig.exists() && relOrig.length() > 0 -> relOrig
+            absOrig.exists() && absOrig.length() > 0 -> absOrig
+            else -> relThumb
+        }
     }
 
     val pixels = photoWithTags.photo.width.toLong() * photoWithTags.photo.height.toLong()
@@ -433,7 +441,7 @@ private fun PhotoComparisonCard(
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(thumbFile)
+                    .data(imageFile)
                     .crossfade(true)
                     .build(),
                 contentDescription = null,

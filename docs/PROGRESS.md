@@ -305,6 +305,36 @@ BUILD SUCCESSFUL in 58s
   - Output binary: `~/storage/downloads/tagshot-debug.apk` (17 MB).
   - SHA-256: `1604ad19d58a4702ee087151c254dbf4ce943fa20bd0f8c54623f5f59d24cad4`.
 
+---
+
+## Phase 12: Premium Search Widget, Micro-Action Buttons, Compact Bottom Nav Dock & Duplicate Detection Robustness
+- Status: PASSED
+- Implemented Features:
+  1. **Liquid Frosted Glass Capsule Search Widget**:
+     - 42dp floating pill capsule (`RoundedCornerShape(21.dp)`) with subtle specular gradient highlight border (`glassBorder`).
+     - Minimalist Apple SF-style search magnifier (`R.drawable.ic_sf_search`) in theme primary tint.
+     - Fluid single-line `BasicTextField` with custom animated placeholder ("Search photos, tags...").
+     - Animated micro-circular clear button with bouncy feedback.
+  2. **Jewelry-Grade Squircle Micro-Action Buttons**:
+     - 42dp x 42dp frosted glass buttons (`RoundedCornerShape(13.dp)`) with vertical specular gradient borders.
+     - Tactile spring physics via `bouncyClickable(scaleDownFactor = 0.88f)`.
+     - Integrated with Sort Menu (Newest, Oldest, Tag Name A-Z), View Style Switcher (Grid, Windows Details, Masonry), and Overflow Options.
+  3. **Ultra-Compact Floating Bottom Navigation Dock**:
+     - Streamlined `BottomPillNavDock` total width from 300dp to 250dp and height from 48dp to 38dp.
+     - Reduced active sliding indicator height to 34dp and icon size to 17dp with 9.5sp typography.
+     - Dock bottom padding adjusted to 8dp for maximal photo viewing canvas.
+  4. **Duplicate Photo Detection Engine Enhancements**:
+     - Global library scanning across all albums and folders (`repository.observePhotos().first()`).
+     - Multi-tier candidate file path resolution (relative thumbnail, relative original, absolute path).
+     - Triple-engine matching: bitwise SHA-256 exact match, exact file size + dimension matching, and 64-bit dHash perceptual hashing with safe dynamic downsampling and distance threshold 8.
+     - Automatic launch of `DuplicateDecisionHubDialog` upon scan completion with instant side-by-side comparison and storage reclaim breakdown.
+- Unit Testing:
+  - All test suites passed: `./gradlew testDebugUnitTest` (`BUILD SUCCESSFUL in 3m 5s`, 26 actionable tasks, 0 failures).
+- Production Assembly & Delivery:
+  - Binary: `~/storage/downloads/tagshot-debug.apk` (17 MB).
+  - SHA-256: `e4fcde9e6d7c7afd09baa25a01415a0bff3c7088ca7642b2e3d04969fd02e82d`.
+
+
 
 
 

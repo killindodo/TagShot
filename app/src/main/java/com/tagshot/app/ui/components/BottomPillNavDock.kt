@@ -67,10 +67,10 @@ fun BottomPillNavDock(
     modifier: Modifier = Modifier,
     hapticsEnabled: Boolean = true
 ) {
-    val capsuleShape = RoundedCornerShape(28.dp)
-    val itemShape = RoundedCornerShape(22.dp)
+    val capsuleShape = RoundedCornerShape(20.dp)
+    val itemShape = RoundedCornerShape(15.dp)
     val primaryColor = MaterialTheme.colorScheme.primary
-    val neonUnderglowColor = primaryColor.copy(alpha = 0.25f)
+    val neonUnderglowColor = primaryColor.copy(alpha = 0.22f)
 
     val activeIndex = NAV_ITEMS.indexOfFirst { it.tab == activeTab }.coerceAtLeast(0)
 
@@ -82,18 +82,18 @@ fun BottomPillNavDock(
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .padding(horizontal = 6.dp, vertical = 1.dp)
                 .shadow(
-                    elevation = 22.dp,
+                    elevation = 14.dp,
                     shape = capsuleShape,
-                    spotColor = primaryColor.copy(alpha = 0.70f),
+                    spotColor = primaryColor.copy(alpha = 0.60f),
                     ambientColor = neonUnderglowColor
                 )
                 .background(
                     brush = Brush.radialGradient(
                         colors = listOf(
                             neonUnderglowColor,
-                            primaryColor.copy(alpha = 0.08f),
+                            primaryColor.copy(alpha = 0.06f),
                             Color.Transparent
                         )
                     ),
@@ -105,9 +105,9 @@ fun BottomPillNavDock(
         Box(
             modifier = Modifier
                 .shadow(
-                    elevation = 18.dp,
+                    elevation = 12.dp,
                     shape = capsuleShape,
-                    spotColor = Color.Black.copy(alpha = 0.55f),
+                    spotColor = Color.Black.copy(alpha = 0.45f),
                     ambientColor = neonUnderglowColor
                 )
                 .clip(capsuleShape)
@@ -118,9 +118,9 @@ fun BottomPillNavDock(
                     highlightColor = Color.White.copy(alpha = 0.20f),
                     shadowColor = primaryColor.copy(alpha = 0.15f)
                 )
-                .padding(horizontal = 6.dp, vertical = 6.dp)
+                .padding(horizontal = 4.dp, vertical = 3.dp)
         ) {
-            val totalInnerWidth = 300.dp
+            val totalInnerWidth = 250.dp
             val tabCount = NAV_ITEMS.size
             val indicatorWidth = totalInnerWidth / tabCount
 
@@ -143,7 +143,7 @@ fun BottomPillNavDock(
                     modifier = Modifier
                         .offset(x = animatedIndicatorOffset)
                         .width(indicatorWidth)
-                        .height(48.dp)
+                        .height(34.dp)
                         .clip(itemShape)
                         .background(
                             brush = Brush.verticalGradient(
@@ -175,7 +175,7 @@ fun BottomPillNavDock(
                         val isSelected = activeTab == item.tab
 
                         val iconScale by animateFloatAsState(
-                            targetValue = if (isSelected) 1.15f else 1.0f,
+                            targetValue = if (isSelected) 1.12f else 1.0f,
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                 stiffness = Spring.StiffnessMedium
@@ -198,7 +198,7 @@ fun BottomPillNavDock(
                             verticalArrangement = Arrangement.Center,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
+                                .height(36.dp)
                                 .clip(itemShape)
                                 .bouncyClickable(
                                     scaleDownFactor = 0.92f,
@@ -211,13 +211,13 @@ fun BottomPillNavDock(
                                 contentDescription = item.title,
                                 tint = contentColor,
                                 modifier = Modifier
-                                    .size(20.dp)
+                                    .size(17.dp)
                                     .scale(iconScale)
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(1.dp))
                             Text(
                                 text = item.title,
-                                fontSize = 11.sp,
+                                fontSize = 9.5.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = contentColor,
                                 maxLines = 1

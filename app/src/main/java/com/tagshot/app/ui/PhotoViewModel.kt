@@ -245,20 +245,40 @@ class PhotoViewModel(
         viewModelScope.launch(defaultDispatcher) {
             _isScanningDuplicatesFlow.value = true
             try {
-                val currentPhotos = (uiState.value as? MainUiState.Success)?.photos
-                    ?: repository.observePhotos().first()
+                // Fetch the entire photo catalog to scan across all albums and folders
+                val allPhotos = repository.observePhotos().first()
+
+                if (allPhotos.size < 2) {
+                    _duplicateClustersFlow.value = emptyList()
+                    _eventChannel.send(UiEvent.ShowMessage("Need at least 2 photos in library to scan for duplicates."))
+                    return@launch
+                }
 
                 val hashMap = mutableMapOf<Long, Long>()
-                for (photo in currentPhotos) {
-                    val thumbFile = File(context.filesDir, photo.photo.thumbPath)
-                    val hash = DuplicateFinder.computeDHashFromFile(thumbFile)
-                    if (hash != null) {
-                        hashMap[photo.photo.id] = hash
+                for (photo in allPhotos) {
+                    val candidateFile = when {
+                        File(context.filesDir, photo.photo.thumbPath).exists() -> File(context.filesDir, photo.photo.thumbPath)
+                        File(context.filesDir, photo.photo.originalPath).exists() -> File(context.filesDir, photo.photo.originalPath)
+                        File(photo.photo.originalPath).exists() -> File(photo.photo.originalPath)
+                        else -> null
+                    }
+                    if (candidateFile != null) {
+                        val hash = DuplicateFinder.computeDHashFromFile(candidateFile)
+                        if (hash != null) {
+                            hashMap[photo.photo.id] = hash
+                        }
                     }
                 }
 
-                val clusters = DuplicateFinder.findClusters(currentPhotos, hashMap, maxHammingDistance = 5)
+                val clusters = DuplicateFinder.findClusters(allPhotos, hashMap, maxHammingDistance = 8)
                 _duplicateClustersFlow.value = clusters
+
+                if (clusters.isEmpty()) {
+                    _eventChannel.send(UiEvent.ShowMessage("Scan complete: No duplicates found. Your library is 100% unique!"))
+                } else {
+                    val reclaimMb = clusters.sumOf { it.reclaimableBytes } / (1024.0 * 1024.0)
+                    _eventChannel.send(UiEvent.ShowMessage("Found ${clusters.size} duplicate cluster(s)! Reclaimable: %.1f MB".format(reclaimMb)))
+                }
             } catch (e: Exception) {
                 _eventChannel.send(UiEvent.ShowMessage("Scan error: ${e.message}"))
             } finally {
