@@ -66,6 +66,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
@@ -103,6 +104,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -121,6 +123,7 @@ import androidx.core.content.FileProvider
 import com.tagshot.app.domain.SortOrder
 import com.tagshot.app.domain.TagMatchMode
 import com.tagshot.app.ui.components.BottomPillNavDock
+import com.tagshot.app.ui.components.DateRangeFilterDialog
 import com.tagshot.app.ui.components.FastScrollScrubber
 import com.tagshot.app.ui.components.PhotoCell
 import com.tagshot.app.ui.components.StickyTimelineHeaderOverlay
@@ -135,6 +138,9 @@ import com.tagshot.app.ui.theme.TagPalettePreset
 import com.tagshot.app.ui.theme.TagPosition
 import com.tagshot.app.ui.theme.TagShape
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -176,6 +182,10 @@ fun MainScreen(
     val scrubberWidth = remember(scrubberWidthStr) { ScrubberWidth.fromNameOrDefault(scrubberWidthStr) }
     val scrubberBubbleStyle = remember(scrubberBubbleStyleStr) { ScrubberBubbleStyle.fromNameOrDefault(scrubberBubbleStyleStr) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val startDate by viewModel.startDateFlow.collectAsState()
+    val endDate by viewModel.endDateFlow.collectAsState()
+    var showDateRangeDialog by remember { mutableStateOf(false) }
 
     val currentTab by remember(uiState) {
         derivedStateOf { (uiState as? MainUiState.Success)?.activeTab ?: MainTab.ALL_PHOTOS }
@@ -300,7 +310,8 @@ fun MainScreen(
                 MainTopBar(
                     viewModel = viewModel,
                     onNavigateToTagManager = onNavigateToTagManager,
-                    onSelectFolderClick = { folderPickerLauncher.launch(null) }
+                    onSelectFolderClick = { folderPickerLauncher.launch(null) },
+                    onOpenDateRange = { showDateRangeDialog = true }
                 )
             }
         },
@@ -424,7 +435,10 @@ fun MainScreen(
                                     // Tag Filter Chips Row for photos in this folder
                                     TagChipsRow(
                                         viewModel = viewModel,
-                                        state = state
+                                        state = state,
+                                        startDate = startDate,
+                                        endDate = endDate,
+                                        onOpenDateRange = { showDateRangeDialog = true }
                                     )
 
                                     if (state.photos.isEmpty()) {
@@ -469,7 +483,10 @@ fun MainScreen(
                             MainTab.ALL_PHOTOS -> {
                                 TagChipsRow(
                                     viewModel = viewModel,
-                                    state = state
+                                    state = state,
+                                    startDate = startDate,
+                                    endDate = endDate,
+                                    onOpenDateRange = { showDateRangeDialog = true }
                                 )
 
                                 if (state.totalLibraryCount == 0) {
@@ -530,6 +547,20 @@ fun MainScreen(
                 )
             }
         }
+    }
+
+    // Dialog: Date Range Filter
+    if (showDateRangeDialog) {
+        val allPhotos = (uiState as? MainUiState.Success)?.photos ?: emptyList()
+        DateRangeFilterDialog(
+            initialStartDate = startDate,
+            initialEndDate = endDate,
+            allPhotos = allPhotos,
+            onApplyRange = { start, end -> viewModel.setDateRange(start, end) },
+            onClearRange = { viewModel.clearDateRange() },
+            onDismiss = { showDateRangeDialog = false },
+            hapticsEnabled = hapticsEnabled
+        )
     }
 
     // Dialog: Tag input when importing photos from gallery
@@ -728,11 +759,15 @@ private fun GlassActionPillButton(
 private fun MainTopBar(
     viewModel: PhotoViewModel,
     onNavigateToTagManager: () -> Unit,
-    onSelectFolderClick: () -> Unit
+    onSelectFolderClick: () -> Unit,
+    onOpenDateRange: () -> Unit
 ) {
     val query by viewModel.queryFlow.collectAsState()
     val sortOrderName by viewModel.sortOrderFlow.collectAsState()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
+    val startDate by viewModel.startDateFlow.collectAsState()
+    val endDate by viewModel.endDateFlow.collectAsState()
+    val isDateFiltered = startDate != null || endDate != null
     var showSortMenu by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
 
@@ -830,6 +865,15 @@ private fun MainTopBar(
                 }
             }
 
+            // Date Range Filter Button
+            GlassActionPillButton(
+                icon = Icons.Default.DateRange,
+                contentDescription = "Filter photos by date range",
+                isActive = isDateFiltered,
+                hapticsEnabled = hapticsEnabled,
+                onClick = onOpenDateRange
+            )
+
             // Sort Menu Button
             Box {
                 GlassActionPillButton(
@@ -844,7 +888,7 @@ private fun MainTopBar(
                     onDismissRequest = { showSortMenu = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Newest first") },
+                        text = { Text("Date Added (Newest)") },
                         trailingIcon = { if (currentSort == SortOrder.NEWEST) Icon(Icons.Default.Check, null) },
                         onClick = {
                             viewModel.onSortOrderSelected(SortOrder.NEWEST)
@@ -852,10 +896,26 @@ private fun MainTopBar(
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Oldest first") },
+                        text = { Text("Date Added (Oldest)") },
                         trailingIcon = { if (currentSort == SortOrder.OLDEST) Icon(Icons.Default.Check, null) },
                         onClick = {
                             viewModel.onSortOrderSelected(SortOrder.OLDEST)
+                            showSortMenu = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Date Taken (Newest)") },
+                        trailingIcon = { if (currentSort == SortOrder.DATE_TAKEN_NEWEST) Icon(Icons.Default.Check, null) },
+                        onClick = {
+                            viewModel.onSortOrderSelected(SortOrder.DATE_TAKEN_NEWEST)
+                            showSortMenu = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Date Taken (Oldest)") },
+                        trailingIcon = { if (currentSort == SortOrder.DATE_TAKEN_OLDEST) Icon(Icons.Default.Check, null) },
+                        onClick = {
+                            viewModel.onSortOrderSelected(SortOrder.DATE_TAKEN_OLDEST)
                             showSortMenu = false
                         }
                     )
@@ -930,12 +990,15 @@ private fun MainTopBar(
 @Composable
 private fun TagChipsRow(
     viewModel: PhotoViewModel,
-    state: MainUiState.Success
+    state: MainUiState.Success,
+    startDate: Long?,
+    endDate: Long?,
+    onOpenDateRange: () -> Unit
 ) {
     val selectedIds = state.filterState.selectedTagIds
     val untaggedOnly = state.filterState.untaggedOnly
-    val isAllSelected by remember(selectedIds, untaggedOnly) {
-        derivedStateOf { selectedIds.isEmpty() && !untaggedOnly }
+    val isAllSelected by remember(selectedIds, untaggedOnly, startDate, endDate) {
+        derivedStateOf { selectedIds.isEmpty() && !untaggedOnly && startDate == null && endDate == null }
     }
 
     LazyRow(
@@ -943,11 +1006,54 @@ private fun TagChipsRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
+        // Active Date Range Filter Chip
+        if (startDate != null || endDate != null) {
+            item(key = "chip_date_range_active") {
+                val startStr = startDate?.let { SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(it)) } ?: "Earliest"
+                val endStr = endDate?.let { SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(it)) } ?: "Latest"
+                val rangeLabel = if (startDate != null && endDate != null) "$startStr – $endStr" else if (startDate != null) "From $startStr" else "Up to $endStr"
+
+                FilterChip(
+                    selected = true,
+                    onClick = onOpenDateRange,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        IconButton(
+                            onClick = { viewModel.clearDateRange() },
+                            modifier = Modifier.size(18.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Clear date filter",
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    },
+                    label = { Text("📅 $rangeLabel", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTrailingIconColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
+        }
+
         // "All" Chip
         item(key = "chip_all") {
             FilterChip(
                 selected = isAllSelected,
-                onClick = { viewModel.onClearFilters() },
+                onClick = {
+                    viewModel.onClearFilters()
+                    viewModel.clearDateRange()
+                },
                 label = { Text("All (${state.totalLibraryCount})") },
                 colors = FilterChipDefaults.filterChipColors()
             )

@@ -228,4 +228,33 @@ class PhotoFilterTest {
             }
         }
     }
+
+    @Test
+    fun testDateRangeFilter_boundariesAndInclusivity() {
+        val p1 = FilterPhoto(id = 1L, normalizedTags = setOf("test"), tagIds = setOf(1L), timestamp = 1000L)
+        val p2 = FilterPhoto(id = 2L, normalizedTags = setOf("test"), tagIds = setOf(1L), timestamp = 2000L)
+        val p3 = FilterPhoto(id = 3L, normalizedTags = setOf("test"), tagIds = setOf(1L), timestamp = 3000L)
+
+        val photos = listOf(p1, p2, p3)
+
+        // Null start and end matches everything
+        val all = PhotoFilter.filter(photos, FilterState()) { it }
+        assertEquals(3, all.size)
+
+        // Between 1500 and 2500 -> only p2
+        val range = PhotoFilter.filter(photos, FilterState(startDate = 1500L, endDate = 2500L)) { it }
+        assertEquals(listOf(p2), range)
+
+        // Exactly on boundary (1000 to 2000) inclusive
+        val boundary = PhotoFilter.filter(photos, FilterState(startDate = 1000L, endDate = 2000L)) { it }
+        assertEquals(listOf(p1, p2), boundary)
+
+        // Start only
+        val startOnly = PhotoFilter.filter(photos, FilterState(startDate = 2500L)) { it }
+        assertEquals(listOf(p3), startOnly)
+
+        // End only
+        val endOnly = PhotoFilter.filter(photos, FilterState(endDate = 1500L)) { it }
+        assertEquals(listOf(p1), endOnly)
+    }
 }

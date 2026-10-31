@@ -330,9 +330,31 @@ BUILD SUCCESSFUL in 58s
      - Automatic launch of `DuplicateDecisionHubDialog` upon scan completion with instant side-by-side comparison and storage reclaim breakdown.
 - Unit Testing:
   - All test suites passed: `./gradlew testDebugUnitTest` (`BUILD SUCCESSFUL in 3m 5s`, 26 actionable tasks, 0 failures).
-- Production Assembly & Delivery:
-  - Binary: `~/storage/downloads/tagshot-debug.apk` (17 MB).
-  - SHA-256: `e4fcde9e6d7c7afd09baa25a01415a0bff3c7088ca7642b2e3d04969fd02e82d`.
+---
+
+## Phase 13: Date-Wise Photo Browsing, Date Range Filtering & Capture Date Sorting
+- Status: PASSED
+- Implemented Features:
+  1. **Date Range Filter Engine (`PhotoFilter.kt` & `PhotoViewModel.kt`)**:
+     - Added `startDate` and `endDate` boundaries to `FilterState` and `FilterOptions`.
+     - Timestamp mapping in `FilterPhoto` using effective capture date (`p.photo.takenAt ?: p.photo.addedAt`).
+     - Fast Date Presets: `DatePreset.TODAY`, `DatePreset.PAST_7_DAYS`, `DatePreset.THIS_MONTH`, `DatePreset.PAST_30_DAYS`, `DatePreset.THIS_YEAR`.
+  2. **High-End Date Range Filter Modal (`DateRangeFilterDialog.kt`)**:
+     - Fast 1-tap quick preset pills for instant multi-day / multi-month filtering.
+     - Custom start and end date selector cards with Android native `DatePickerDialog` integration.
+     - Real-time matching photo counter (e.g. `"Matches 74 of 194 photos"`).
+     - Reset and Apply Range action buttons with tactile haptics.
+  3. **Main Screen Date Filtering & Date Taken Sorting**:
+     - Added dedicated Date Filter squircle button in `MainTopBar` with active illumination when filtered.
+     - Extended Sort options in `PhotoSorter.kt`: `Date Added (Newest)`, `Date Added (Oldest)`, `Date Taken (Newest)`, `Date Taken (Oldest)`, `Tag name (A-Z)`.
+     - Added prominent active date chip in `TagChipsRow` with 1-tap clear button (`✕`).
+- Comprehensive Verification:
+  - Unit Tests: Added `testDateRangeFilter_boundariesAndInclusivity` and `testDateTakenSortOrder`. All test suites PASSED in 2m 31s (`BUILD SUCCESSFUL`).
+  - Production Build: Assembled `tagshot-debug.apk` in 42s.
+  - Output binary: `~/storage/downloads/tagshot-debug.apk` (17 MB).
+  - SHA-256: `9c31d858976c34b0d1a4da40561394ad6c1ec1a7be985000f60b5e4531d8db5f`.
+  - On-Device Live Verification: Verified live on device via ADB with screenshots `20_date_filter_button_visible.png` through `25_sort_menu_with_date_options.png`.
+
 
 
 

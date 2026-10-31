@@ -98,7 +98,9 @@ private data class FilterOptions(
     val matchModeName: String,
     val sortOrderName: String,
     val activeTabName: String,
-    val selectedFolder: String
+    val selectedFolder: String,
+    val startDate: Long? = null,
+    val endDate: Long? = null
 )
 
 private data class ImportState(
@@ -138,6 +140,8 @@ class PhotoViewModel(
         private const val KEY_SCRUBBER_WIDTH = "key_scrubber_width"
         private const val KEY_SCRUBBER_BUBBLE_STYLE = "key_scrubber_bubble_style"
         private const val KEY_UI_DESIGN_SYSTEM = "key_ui_design_system"
+        private const val KEY_START_DATE = "key_start_date"
+        private const val KEY_END_DATE = "key_end_date"
     }
 
     // Persisted state via SavedStateHandle
@@ -148,6 +152,8 @@ class PhotoViewModel(
     val sortOrderFlow = savedStateHandle.getStateFlow(KEY_SORT_ORDER, SortOrder.NEWEST.name)
     val activeTabFlow = savedStateHandle.getStateFlow(KEY_ACTIVE_TAB, MainTab.ALL_PHOTOS.name)
     val selectedFolderFlow = savedStateHandle.getStateFlow(KEY_SELECTED_FOLDER, "")
+    val startDateFlow: StateFlow<Long?> = savedStateHandle.getStateFlow<Long?>(KEY_START_DATE, null)
+    val endDateFlow: StateFlow<Long?> = savedStateHandle.getStateFlow<Long?>(KEY_END_DATE, null)
     val gridColumns: StateFlow<Int> = savedStateHandle.getStateFlow(KEY_GRID_COLUMNS, 2)
     val hapticsEnabled: StateFlow<Boolean> = savedStateHandle.getStateFlow(KEY_HAPTICS_ENABLED, true)
     val themeModeFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_THEME_MODE, "SYSTEM")
@@ -239,6 +245,77 @@ class PhotoViewModel(
 
     fun setUiDesignSystem(designSystem: UiDesignSystem) {
         savedStateHandle[KEY_UI_DESIGN_SYSTEM] = designSystem.name
+    }
+
+    fun setDateRange(startDate: Long?, endDate: Long?) {
+        savedStateHandle[KEY_START_DATE] = startDate
+        savedStateHandle[KEY_END_DATE] = endDate
+    }
+
+    fun clearDateRange() {
+        setDateRange(null, null)
+    }
+
+    enum class DatePreset(val label: String) {
+        TODAY("Today"),
+        PAST_7_DAYS("Past 7 Days"),
+        THIS_MONTH("This Month"),
+        PAST_30_DAYS("Past 30 Days"),
+        THIS_YEAR("This Year")
+    }
+
+    fun setDatePreset(preset: DatePreset) {
+        val calendar = java.util.Calendar.getInstance()
+
+        // End of today: 23:59:59.999
+        calendar.set(java.util.Calendar.HOUR_OF_DAY, 23)
+        calendar.set(java.util.Calendar.MINUTE, 59)
+        calendar.set(java.util.Calendar.SECOND, 59)
+        calendar.set(java.util.Calendar.MILLISECOND, 999)
+        val endOfToday = calendar.timeInMillis
+
+        val start = when (preset) {
+            DatePreset.TODAY -> {
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                calendar.timeInMillis
+            }
+            DatePreset.PAST_7_DAYS -> {
+                calendar.add(java.util.Calendar.DAY_OF_YEAR, -6)
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                calendar.timeInMillis
+            }
+            DatePreset.THIS_MONTH -> {
+                calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                calendar.timeInMillis
+            }
+            DatePreset.PAST_30_DAYS -> {
+                calendar.add(java.util.Calendar.DAY_OF_YEAR, -29)
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                calendar.timeInMillis
+            }
+            DatePreset.THIS_YEAR -> {
+                calendar.set(java.util.Calendar.DAY_OF_YEAR, 1)
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                calendar.timeInMillis
+            }
+        }
+        setDateRange(start, endOfToday)
     }
 
     fun scanForDuplicates(context: Context) {
@@ -362,12 +439,18 @@ class PhotoViewModel(
             matchModeName = matchModeName,
             sortOrderName = sortOrderName,
             activeTabName = activeTabFlow.value,
-            selectedFolder = selectedFolderFlow.value
+            selectedFolder = selectedFolderFlow.value,
+            startDate = startDateFlow.value,
+            endDate = endDateFlow.value
         )
     }.combine(activeTabFlow) { opts, tab ->
         opts.copy(activeTabName = tab)
     }.combine(selectedFolderFlow) { opts, folder ->
         opts.copy(selectedFolder = folder)
+    }.combine(startDateFlow) { opts, start ->
+        opts.copy(startDate = start)
+    }.combine(endDateFlow) { opts, end ->
+        opts.copy(endDate = end)
     }
 
     private val importStateFlow: Flow<ImportState> = combine(
@@ -422,7 +505,9 @@ class PhotoViewModel(
             query = filterOpts.query,
             selectedTagIds = validSelectedTagIds,
             untaggedOnly = filterOpts.untaggedOnly,
-            matchMode = matchMode
+            matchMode = matchMode,
+            startDate = filterOpts.startDate,
+            endDate = filterOpts.endDate
         )
 
         val sortOrder = try {
@@ -450,7 +535,8 @@ class PhotoViewModel(
             FilterPhoto(
                 id = p.photo.id,
                 normalizedTags = p.tags.map { it.normalizedName }.toSet(),
-                tagIds = p.tags.map { it.id }.toSet()
+                tagIds = p.tags.map { it.id }.toSet(),
+                timestamp = p.photo.takenAt ?: p.photo.addedAt
             )
         }
 
@@ -459,7 +545,8 @@ class PhotoViewModel(
             SortablePhoto(
                 id = p.photo.id,
                 addedAt = p.photo.addedAt,
-                normalizedTags = p.tags.map { it.normalizedName }.toSet()
+                normalizedTags = p.tags.map { it.normalizedName }.toSet(),
+                takenAt = p.photo.takenAt
             )
         }
 

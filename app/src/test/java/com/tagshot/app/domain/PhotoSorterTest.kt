@@ -58,6 +58,23 @@ class PhotoSorterTest {
     }
 
     @Test
+    fun testDateTakenSortOrder() {
+        val p1 = SortablePhoto(id = 1L, addedAt = 5000L, normalizedTags = setOf("a"), takenAt = 1000L)
+        val p2 = SortablePhoto(id = 2L, addedAt = 1000L, normalizedTags = setOf("b"), takenAt = 3000L)
+        val p3 = SortablePhoto(id = 3L, addedAt = 3000L, normalizedTags = setOf("c"), takenAt = 2000L)
+
+        val photos = listOf(p1, p2, p3)
+
+        // DATE_TAKEN_NEWEST: p2 (3000) > p3 (2000) > p1 (1000)
+        val sortedNewest = PhotoSorter.sort(photos, SortOrder.DATE_TAKEN_NEWEST) { it }
+        assertEquals(listOf(p2, p3, p1), sortedNewest)
+
+        // DATE_TAKEN_OLDEST: p1 (1000) < p3 (2000) < p2 (3000)
+        val sortedOldest = PhotoSorter.sort(photos, SortOrder.DATE_TAKEN_OLDEST) { it }
+        assertEquals(listOf(p1, p3, p2), sortedOldest)
+    }
+
+    @Test
     fun testPermutationIdempotenceAndShuffleStability() {
         val rng = Random(42)
         val tags = listOf("apple", "banana", "cat", "dog", "elephant")

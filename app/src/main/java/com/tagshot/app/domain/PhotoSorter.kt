@@ -3,13 +3,16 @@ package com.tagshot.app.domain
 enum class SortOrder {
     NEWEST,
     OLDEST,
+    DATE_TAKEN_NEWEST,
+    DATE_TAKEN_OLDEST,
     TAG_NAME
 }
 
 data class SortablePhoto(
     val id: Long,
     val addedAt: Long,
-    val normalizedTags: Set<String>
+    val normalizedTags: Set<String>,
+    val takenAt: Long? = null
 )
 
 object PhotoSorter {
@@ -64,9 +67,35 @@ object PhotoSorter {
         }
     }
 
+    /**
+     * Comparator for [SortOrder.DATE_TAKEN_NEWEST]:
+     * Primary: `takenAt ?: addedAt` descending.
+     * Tie-break: `id` descending.
+     */
+    val dateTakenNewestComparator = Comparator<SortablePhoto> { a, b ->
+        val timeA = a.takenAt ?: a.addedAt
+        val timeB = b.takenAt ?: b.addedAt
+        val timeCmp = timeB.compareTo(timeA)
+        if (timeCmp != 0) timeCmp else b.id.compareTo(a.id)
+    }
+
+    /**
+     * Comparator for [SortOrder.DATE_TAKEN_OLDEST]:
+     * Primary: `takenAt ?: addedAt` ascending.
+     * Tie-break: `id` ascending.
+     */
+    val dateTakenOldestComparator = Comparator<SortablePhoto> { a, b ->
+        val timeA = a.takenAt ?: a.addedAt
+        val timeB = b.takenAt ?: b.addedAt
+        val timeCmp = timeA.compareTo(timeB)
+        if (timeCmp != 0) timeCmp else a.id.compareTo(b.id)
+    }
+
     fun getComparator(order: SortOrder): Comparator<SortablePhoto> = when (order) {
         SortOrder.NEWEST -> newestComparator
         SortOrder.OLDEST -> oldestComparator
+        SortOrder.DATE_TAKEN_NEWEST -> dateTakenNewestComparator
+        SortOrder.DATE_TAKEN_OLDEST -> dateTakenOldestComparator
         SortOrder.TAG_NAME -> tagNameComparator
     }
 

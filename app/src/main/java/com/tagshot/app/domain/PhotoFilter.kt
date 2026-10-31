@@ -11,14 +11,17 @@ enum class TagMatchMode {
 data class FilterPhoto(
     val id: Long,
     val normalizedTags: Set<String>,
-    val tagIds: Set<Long>
+    val tagIds: Set<Long>,
+    val timestamp: Long = 0L
 )
 
 data class FilterState(
     val query: String = "",
     val selectedTagIds: Set<Long> = emptySet(),
     val untaggedOnly: Boolean = false,
-    val matchMode: TagMatchMode = TagMatchMode.ANY
+    val matchMode: TagMatchMode = TagMatchMode.ANY,
+    val startDate: Long? = null,
+    val endDate: Long? = null
 )
 
 object PhotoFilter {
@@ -112,13 +115,23 @@ object PhotoFilter {
     }
 
     /**
+     * Tests if photo's timestamp falls within [startDate] and [endDate] bounds (inclusive).
+     */
+    fun matchDateRange(timestamp: Long, startDate: Long?, endDate: Long?): Boolean {
+        if (startDate != null && timestamp < startDate) return false
+        if (endDate != null && timestamp > endDate) return false
+        return true
+    }
+
+    /**
      * Evaluates total visibility predicate:
-     * visible(p) = matchText(p) ∧ matchChips(p, matchMode) ∧ matchUntagged(p)
+     * visible(p) = matchText(p) ∧ matchChips(p, matchMode) ∧ matchUntagged(p) ∧ matchDateRange(p)
      */
     fun matches(photo: FilterPhoto, tokens: List<String>, state: FilterState): Boolean {
         return matchText(photo, tokens) &&
                 matchChips(photo, state.selectedTagIds, state.matchMode) &&
-                matchUntagged(photo, state.untaggedOnly)
+                matchUntagged(photo, state.untaggedOnly) &&
+                matchDateRange(photo.timestamp, state.startDate, state.endDate)
     }
 
     /**
