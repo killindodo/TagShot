@@ -250,10 +250,14 @@ BUILD SUCCESSFUL in 58s
      - "VIEWING STYLE & LAYOUT": 3-option selector for Grid, Windows List Details, and Masonry.
      - "TAG BADGE CUSTOMIZATION": Selector for Thin/Micro, Standard, and Color Dot with live interactive 3-tag photo preview card.
      - "WINDOWS DETAILS LIST OPTIONS": Individual toggle switches for File Size & Dimensions, Timestamp, and Folder Location Pill.
-  5. **Verification**:
+  5. **Verification & Installation**:
      - Unit test suite: 43/43 tests PASSED (`BUILD SUCCESSFUL in 1m 44s`).
      - Build verification: `app-debug.apk` built successfully (`BUILD SUCCESSFUL in 33s`).
      - Output binary: `~/storage/downloads/tagshot-debug.apk` (SHA-256: `91a3e069c535bcc48ff40e80fbd9750c1cc9c9d403cab69b8a272d1f68142023`).
+     - On-Device Installation: Installed via `adb install -r ~/storage/downloads/tagshot-debug.apk` (`Success`).
+     - App Launch: Launched via `adb shell am start -n com.tagshot.app/.MainActivity` (`Starting: Intent { cmp=com.tagshot.app/.MainActivity }`).
+     - Logcat Audit: 0 runtime errors / exceptions.
+     - Screenshot: Saved to `~/storage/downloads/tagshot-installed.png`.
 
 
 
