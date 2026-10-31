@@ -816,4 +816,29 @@ class PhotoViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testUiDesignSystemAutoAdaptation() = runTest(testDispatcher) {
+        val handle = SavedStateHandle()
+        val viewModel = PhotoViewModel(repository, handle, testDispatcher)
+
+        // Default should be LIQUID_GLASS
+        assertEquals(com.tagshot.app.ui.theme.UiDesignSystem.LIQUID_GLASS.name, viewModel.uiDesignSystemFlow.value)
+
+        // Switching to RETRO_WIN95 must auto-adapt TagShape to SHARP_RECT, TagAnimation to NONE,
+        // ScrubberStyle to RETRO_WINDOWS, and ScrubberBubbleStyle to WINDOWS_95_TOOLTIP
+        viewModel.setUiDesignSystem(com.tagshot.app.ui.theme.UiDesignSystem.RETRO_WIN95)
+        assertEquals(com.tagshot.app.ui.theme.UiDesignSystem.RETRO_WIN95.name, viewModel.uiDesignSystemFlow.value)
+        assertEquals(com.tagshot.app.ui.theme.TagShape.SHARP_RECT.name, viewModel.tagShapeFlow.value)
+        assertEquals(com.tagshot.app.ui.theme.TagAnimation.NONE.name, viewModel.tagAnimationFlow.value)
+        assertEquals(com.tagshot.app.ui.theme.ScrubberStyle.RETRO_WINDOWS.name, viewModel.scrubberStyleFlow.value)
+        assertEquals(com.tagshot.app.ui.theme.ScrubberBubbleStyle.WINDOWS_95_TOOLTIP.name, viewModel.scrubberBubbleStyleFlow.value)
+
+        // Switching back to LIQUID_GLASS must adapt away from retro-only styles
+        viewModel.setUiDesignSystem(com.tagshot.app.ui.theme.UiDesignSystem.LIQUID_GLASS)
+        assertEquals(com.tagshot.app.ui.theme.UiDesignSystem.LIQUID_GLASS.name, viewModel.uiDesignSystemFlow.value)
+        assertEquals(com.tagshot.app.ui.theme.TagShape.SQUIRCLE.name, viewModel.tagShapeFlow.value)
+        assertEquals(com.tagshot.app.ui.theme.ScrubberStyle.CUPERTINO_CAPSULE.name, viewModel.scrubberStyleFlow.value)
+        assertEquals(com.tagshot.app.ui.theme.ScrubberBubbleStyle.FROSTED_GLASS_LENS.name, viewModel.scrubberBubbleStyleFlow.value)
+    }
 }
