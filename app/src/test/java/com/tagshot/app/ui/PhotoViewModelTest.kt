@@ -32,6 +32,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import com.tagshot.app.ui.components.TagDisplaySize
 
 class FakePhotoRepository : PhotoRepository {
     val photosFlow = MutableStateFlow<List<PhotoWithTags>>(emptyList())
@@ -689,5 +690,67 @@ class PhotoViewModelTest {
 
         viewModel.setThemeMode("LIGHT")
         assertEquals("LIGHT", viewModel.themeModeFlow.value)
+    }
+
+    @Test
+    fun viewingStylePreference_persistedAndCycled() = runTest(testDispatcher) {
+        val handle = SavedStateHandle()
+        val viewModel = PhotoViewModel(repository, handle, testDispatcher)
+
+        // Default should be GRID
+        assertEquals(ViewingStyle.GRID.name, viewModel.viewingStyleFlow.value)
+
+        // Direct setter
+        viewModel.setViewingStyle(ViewingStyle.LIST_DETAILS)
+        assertEquals(ViewingStyle.LIST_DETAILS.name, viewModel.viewingStyleFlow.value)
+
+        // Cycle through GRID -> LIST_DETAILS -> MASONRY -> GRID
+        viewModel.setViewingStyle(ViewingStyle.GRID)
+        viewModel.cycleViewingStyle()
+        assertEquals(ViewingStyle.LIST_DETAILS.name, viewModel.viewingStyleFlow.value)
+
+        viewModel.cycleViewingStyle()
+        assertEquals(ViewingStyle.MASONRY.name, viewModel.viewingStyleFlow.value)
+
+        viewModel.cycleViewingStyle()
+        assertEquals(ViewingStyle.GRID.name, viewModel.viewingStyleFlow.value)
+    }
+
+    @Test
+    fun tagDisplaySizePreference_persistedAndUpdated() = runTest(testDispatcher) {
+        val handle = SavedStateHandle()
+        val viewModel = PhotoViewModel(repository, handle, testDispatcher)
+
+        // Default is THIN_MICRO
+        assertEquals(TagDisplaySize.THIN_MICRO.name, viewModel.tagDisplaySizeFlow.value)
+
+        viewModel.setTagDisplaySize(TagDisplaySize.STANDARD)
+        assertEquals(TagDisplaySize.STANDARD.name, viewModel.tagDisplaySizeFlow.value)
+
+        viewModel.setTagDisplaySize(TagDisplaySize.COLOR_DOT)
+        assertEquals(TagDisplaySize.COLOR_DOT.name, viewModel.tagDisplaySizeFlow.value)
+    }
+
+    @Test
+    fun windowsDetailsToggles_persistedAndUpdated() = runTest(testDispatcher) {
+        val handle = SavedStateHandle()
+        val viewModel = PhotoViewModel(repository, handle, testDispatcher)
+
+        // Defaults are all true
+        assertTrue(viewModel.showListFileSizeFlow.value)
+        assertTrue(viewModel.showListDateFlow.value)
+        assertTrue(viewModel.showListFolderFlow.value)
+
+        // Toggle file size
+        viewModel.setShowListFileSize(false)
+        assertFalse(viewModel.showListFileSizeFlow.value)
+
+        // Toggle date
+        viewModel.setShowListDate(false)
+        assertFalse(viewModel.showListDateFlow.value)
+
+        // Toggle folder
+        viewModel.setShowListFolder(false)
+        assertFalse(viewModel.showListFolderFlow.value)
     }
 }

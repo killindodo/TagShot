@@ -1,10 +1,10 @@
 package com.tagshot.app.ui.components
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -13,16 +13,13 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -33,11 +30,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 
 /**
  * Tactile spring scale modifier with integrated haptic feedback.
@@ -52,41 +47,24 @@ fun Modifier.bouncyClickable(
     onLongClick: (() -> Unit)? = null
 ): Modifier = composed {
     val haptic = LocalHapticFeedback.current
-    val coroutineScope = rememberCoroutineScope()
-    val scale = remember { Animatable(1f) }
     val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val animatedScale by animateFloatAsState(
+        targetValue = if (isPressed) scaleDownFactor else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "bouncyScale"
+    )
 
     this
-        .scale(scale.value)
-        .pointerInput(enabled) {
-            if (!enabled) return@pointerInput
-            awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false)
-                coroutineScope.launch {
-                    scale.animateTo(
-                        targetValue = scaleDownFactor,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        )
-                    )
-                }
-                waitForUpOrCancellation()
-                coroutineScope.launch {
-                    scale.animateTo(
-                        targetValue = 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        )
-                    )
-                }
-            }
-        }
+        .scale(animatedScale)
         .combinedClickable(
             enabled = enabled,
             interactionSource = interactionSource,
-            indication = null, // Custom scale bounce serves as high-end tactile feedback
+            indication = null, // Custom spring bounce serves as high-end tactile feedback
             onClick = {
                 if (hapticsEnabled) {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)

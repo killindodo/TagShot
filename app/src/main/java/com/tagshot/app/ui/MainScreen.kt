@@ -26,11 +26,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -38,11 +42,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.LabelOff
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
@@ -97,6 +104,8 @@ import androidx.core.content.FileProvider
 import com.tagshot.app.domain.SortOrder
 import com.tagshot.app.ui.components.BottomPillNavDock
 import com.tagshot.app.ui.components.PhotoCell
+import com.tagshot.app.ui.components.TagDisplaySize
+import com.tagshot.app.ui.components.WindowsDetailsRow
 import java.io.File
 import java.util.UUID
 
@@ -112,6 +121,18 @@ fun MainScreen(
     val selectedPhotoIds by viewModel.selectedPhotoIds.collectAsState()
     val gridColumns by viewModel.gridColumns.collectAsState()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
+    val viewingStyleStr by viewModel.viewingStyleFlow.collectAsState()
+    val tagDisplaySizeStr by viewModel.tagDisplaySizeFlow.collectAsState()
+    val showListFileSize by viewModel.showListFileSizeFlow.collectAsState()
+    val showListDate by viewModel.showListDateFlow.collectAsState()
+    val showListFolder by viewModel.showListFolderFlow.collectAsState()
+
+    val viewingStyle = remember(viewingStyleStr) {
+        try { ViewingStyle.valueOf(viewingStyleStr) } catch (_: Exception) { ViewingStyle.GRID }
+    }
+    val tagDisplaySize = remember(tagDisplaySizeStr) {
+        try { TagDisplaySize.valueOf(tagDisplaySizeStr) } catch (_: Exception) { TagDisplaySize.THIN_MICRO }
+    }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val currentTab = (uiState as? MainUiState.Success)?.activeTab ?: MainTab.ALL_PHOTOS
@@ -357,37 +378,29 @@ fun MainScreen(
                                     if (state.photos.isEmpty()) {
                                         EmptyFilterView(onClearFilters = { viewModel.onClearFilters() })
                                     } else {
-                                        LazyVerticalGrid(
-                                            columns = GridCells.Fixed(gridColumns),
-                                            contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 96.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            items(
-                                                items = state.photos,
-                                                key = { it.photo.id },
-                                                contentType = { "photo" }
-                                            ) { item ->
-                                                PhotoCell(
-                                                    photoWithTags = item,
-                                                    isSelected = selectedPhotoIds.contains(item.photo.id),
-                                                    isInSelectionMode = isInSelectionMode,
-                                                    onClick = {
-                                                        if (isInSelectionMode) {
-                                                            viewModel.toggleSelection(item.photo.id)
-                                                        } else {
-                                                            onNavigateToDetail(item.photo.id)
-                                                        }
-                                                    },
-                                                    onLongClick = {
-                                                        if (!isInSelectionMode) {
-                                                            viewModel.enterSelection(item.photo.id)
-                                                        }
-                                                    }
-                                                )
+                                        PhotoCollectionView(
+                                            photos = state.photos,
+                                            viewingStyle = viewingStyle,
+                                            gridColumns = gridColumns,
+                                            tagDisplaySize = tagDisplaySize,
+                                            showListFileSize = showListFileSize,
+                                            showListDate = showListDate,
+                                            showListFolder = showListFolder,
+                                            selectedPhotoIds = selectedPhotoIds,
+                                            isInSelectionMode = isInSelectionMode,
+                                            onPhotoClick = { id ->
+                                                if (isInSelectionMode) {
+                                                    viewModel.toggleSelection(id)
+                                                } else {
+                                                    onNavigateToDetail(id)
+                                                }
+                                            },
+                                            onPhotoLongClick = { id ->
+                                                if (!isInSelectionMode) {
+                                                    viewModel.enterSelection(id)
+                                                }
                                             }
-                                        }
+                                        )
                                     }
                                 }
                             }
@@ -402,37 +415,29 @@ fun MainScreen(
                                 } else if (state.photos.isEmpty()) {
                                     EmptyFilterView(onClearFilters = { viewModel.onClearFilters() })
                                 } else {
-                                    LazyVerticalGrid(
-                                        columns = GridCells.Fixed(gridColumns),
-                                        contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 96.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        items(
-                                            items = state.photos,
-                                            key = { it.photo.id },
-                                            contentType = { "photo" }
-                                        ) { item ->
-                                            PhotoCell(
-                                                photoWithTags = item,
-                                                isSelected = selectedPhotoIds.contains(item.photo.id),
-                                                isInSelectionMode = isInSelectionMode,
-                                                onClick = {
-                                                    if (isInSelectionMode) {
-                                                        viewModel.toggleSelection(item.photo.id)
-                                                    } else {
-                                                        onNavigateToDetail(item.photo.id)
-                                                    }
-                                                },
-                                                onLongClick = {
-                                                    if (!isInSelectionMode) {
-                                                        viewModel.enterSelection(item.photo.id)
-                                                    }
-                                                }
-                                            )
+                                    PhotoCollectionView(
+                                        photos = state.photos,
+                                        viewingStyle = viewingStyle,
+                                        gridColumns = gridColumns,
+                                        tagDisplaySize = tagDisplaySize,
+                                        showListFileSize = showListFileSize,
+                                        showListDate = showListDate,
+                                        showListFolder = showListFolder,
+                                        selectedPhotoIds = selectedPhotoIds,
+                                        isInSelectionMode = isInSelectionMode,
+                                        onPhotoClick = { id ->
+                                            if (isInSelectionMode) {
+                                                viewModel.toggleSelection(id)
+                                            } else {
+                                                onNavigateToDetail(id)
+                                            }
+                                        },
+                                        onPhotoLongClick = { id ->
+                                            if (!isInSelectionMode) {
+                                                viewModel.enterSelection(id)
+                                            }
                                         }
-                                    }
+                                    )
                                 }
                             }
                         }
@@ -673,6 +678,37 @@ private fun MainTopBar(
                         }
                     )
                 }
+            }
+
+            // Quick View Switcher Button
+            val viewingStyleStr by viewModel.viewingStyleFlow.collectAsState()
+            val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
+            val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+            val viewingStyle = remember(viewingStyleStr) {
+                try { ViewingStyle.valueOf(viewingStyleStr) } catch (_: Exception) { ViewingStyle.GRID }
+            }
+            val viewIcon = when (viewingStyle) {
+                ViewingStyle.GRID -> Icons.Default.GridView
+                ViewingStyle.LIST_DETAILS -> Icons.AutoMirrored.Filled.ViewList
+                ViewingStyle.MASONRY -> Icons.Default.Dashboard
+            }
+            val viewLabel = when (viewingStyle) {
+                ViewingStyle.GRID -> "Grid View"
+                ViewingStyle.LIST_DETAILS -> "Windows Details List"
+                ViewingStyle.MASONRY -> "Masonry View"
+            }
+            IconButton(
+                onClick = {
+                    if (hapticsEnabled) {
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                    }
+                    viewModel.cycleViewingStyle()
+                }
+            ) {
+                Icon(
+                    imageVector = viewIcon,
+                    contentDescription = "Switch viewing style (current: $viewLabel)"
+                )
             }
 
             // Overflow Menu
@@ -1019,4 +1055,105 @@ private fun sharePhotos(context: android.content.Context, relativePaths: List<St
         }
     }
     context.startActivity(Intent.createChooser(intent, "Share Photo(s)"))
+}
+
+@Composable
+private fun PhotoCollectionView(
+    photos: List<com.tagshot.app.data.PhotoWithTags>,
+    viewingStyle: ViewingStyle,
+    gridColumns: Int,
+    tagDisplaySize: TagDisplaySize,
+    showListFileSize: Boolean,
+    showListDate: Boolean,
+    showListFolder: Boolean,
+    selectedPhotoIds: Set<Long>,
+    isInSelectionMode: Boolean,
+    onPhotoClick: (Long) -> Unit,
+    onPhotoLongClick: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    when (viewingStyle) {
+        ViewingStyle.GRID -> {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(gridColumns),
+                contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 96.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = modifier.fillMaxSize()
+            ) {
+                items(
+                    items = photos,
+                    key = { it.photo.id },
+                    contentType = { "photo_grid" }
+                ) { item ->
+                    PhotoCell(
+                        photoWithTags = item,
+                        isSelected = selectedPhotoIds.contains(item.photo.id),
+                        isInSelectionMode = isInSelectionMode,
+                        tagDisplaySize = tagDisplaySize,
+                        aspectRatio = 1f,
+                        onClick = { onPhotoClick(item.photo.id) },
+                        onLongClick = { onPhotoLongClick(item.photo.id) }
+                    )
+                }
+            }
+        }
+        ViewingStyle.LIST_DETAILS -> {
+            LazyColumn(
+                contentPadding = PaddingValues(start = 10.dp, top = 8.dp, end = 10.dp, bottom = 96.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = modifier.fillMaxSize()
+            ) {
+                items(
+                    items = photos,
+                    key = { it.photo.id },
+                    contentType = { "photo_list" }
+                ) { item ->
+                    WindowsDetailsRow(
+                        photoWithTags = item,
+                        isSelected = selectedPhotoIds.contains(item.photo.id),
+                        isInSelectionMode = isInSelectionMode,
+                        tagDisplaySize = tagDisplaySize,
+                        showFileSize = showListFileSize,
+                        showDate = showListDate,
+                        showFolder = showListFolder,
+                        onClick = { onPhotoClick(item.photo.id) },
+                        onLongClick = { onPhotoLongClick(item.photo.id) }
+                    )
+                }
+            }
+        }
+        ViewingStyle.MASONRY -> {
+            LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.Fixed(gridColumns),
+                contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 96.dp),
+                verticalItemSpacing = 6.dp,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = modifier.fillMaxSize()
+            ) {
+                items(
+                    items = photos,
+                    key = { it.photo.id },
+                    contentType = { "photo_masonry" }
+                ) { item ->
+                    val ratio = remember(item.photo.width, item.photo.height) {
+                        if (item.photo.width > 0 && item.photo.height > 0) {
+                            (item.photo.width.toFloat() / item.photo.height.toFloat()).coerceIn(0.65f, 1.5f)
+                        } else {
+                            1f
+                        }
+                    }
+                    PhotoCell(
+                        photoWithTags = item,
+                        isSelected = selectedPhotoIds.contains(item.photo.id),
+                        isInSelectionMode = isInSelectionMode,
+                        tagDisplaySize = tagDisplaySize,
+                        aspectRatio = ratio,
+                        onClick = { onPhotoClick(item.photo.id) },
+                        onLongClick = { onPhotoLongClick(item.photo.id) }
+                    )
+                }
+            }
+        }
+    }
 }

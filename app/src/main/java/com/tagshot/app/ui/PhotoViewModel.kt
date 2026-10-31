@@ -34,6 +34,13 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import com.tagshot.app.ui.components.TagDisplaySize
+
+enum class ViewingStyle {
+    GRID,
+    LIST_DETAILS,
+    MASONRY
+}
 
 enum class MainTab {
     ALL_PHOTOS,
@@ -101,6 +108,11 @@ class PhotoViewModel(
         private const val KEY_GRID_COLUMNS = "key_grid_columns"
         private const val KEY_HAPTICS_ENABLED = "key_haptics_enabled"
         private const val KEY_THEME_MODE = "key_theme_mode"
+        private const val KEY_VIEWING_STYLE = "key_viewing_style"
+        private const val KEY_TAG_DISPLAY_SIZE = "key_tag_display_size"
+        private const val KEY_SHOW_LIST_FILE_SIZE = "key_show_list_file_size"
+        private const val KEY_SHOW_LIST_DATE = "key_show_list_date"
+        private const val KEY_SHOW_LIST_FOLDER = "key_show_list_folder"
     }
 
     // Persisted state via SavedStateHandle
@@ -113,6 +125,11 @@ class PhotoViewModel(
     val gridColumns: StateFlow<Int> = savedStateHandle.getStateFlow(KEY_GRID_COLUMNS, 2)
     val hapticsEnabled: StateFlow<Boolean> = savedStateHandle.getStateFlow(KEY_HAPTICS_ENABLED, true)
     val themeModeFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_THEME_MODE, "SYSTEM")
+    val viewingStyleFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_VIEWING_STYLE, ViewingStyle.GRID.name)
+    val tagDisplaySizeFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_TAG_DISPLAY_SIZE, TagDisplaySize.THIN_MICRO.name)
+    val showListFileSizeFlow: StateFlow<Boolean> = savedStateHandle.getStateFlow(KEY_SHOW_LIST_FILE_SIZE, true)
+    val showListDateFlow: StateFlow<Boolean> = savedStateHandle.getStateFlow(KEY_SHOW_LIST_DATE, true)
+    val showListFolderFlow: StateFlow<Boolean> = savedStateHandle.getStateFlow(KEY_SHOW_LIST_FOLDER, true)
 
     fun setGridColumns(cols: Int) {
         savedStateHandle[KEY_GRID_COLUMNS] = cols.coerceIn(1, 4)
@@ -124,6 +141,40 @@ class PhotoViewModel(
 
     fun setThemeMode(mode: String) {
         savedStateHandle[KEY_THEME_MODE] = mode
+    }
+
+    fun setViewingStyle(style: ViewingStyle) {
+        savedStateHandle[KEY_VIEWING_STYLE] = style.name
+    }
+
+    fun setTagDisplaySize(size: TagDisplaySize) {
+        savedStateHandle[KEY_TAG_DISPLAY_SIZE] = size.name
+    }
+
+    fun setShowListFileSize(show: Boolean) {
+        savedStateHandle[KEY_SHOW_LIST_FILE_SIZE] = show
+    }
+
+    fun setShowListDate(show: Boolean) {
+        savedStateHandle[KEY_SHOW_LIST_DATE] = show
+    }
+
+    fun setShowListFolder(show: Boolean) {
+        savedStateHandle[KEY_SHOW_LIST_FOLDER] = show
+    }
+
+    fun cycleViewingStyle() {
+        val current = try {
+            ViewingStyle.valueOf(viewingStyleFlow.value)
+        } catch (_: Exception) {
+            ViewingStyle.GRID
+        }
+        val next = when (current) {
+            ViewingStyle.GRID -> ViewingStyle.LIST_DETAILS
+            ViewingStyle.LIST_DETAILS -> ViewingStyle.MASONRY
+            ViewingStyle.MASONRY -> ViewingStyle.GRID
+        }
+        setViewingStyle(next)
     }
 
     // Selection mode state

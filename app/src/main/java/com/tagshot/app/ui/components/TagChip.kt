@@ -3,9 +3,12 @@ package com.tagshot.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,13 +22,23 @@ import androidx.compose.ui.unit.sp
 import com.tagshot.app.domain.TagColor
 
 /**
- * High-end micro-capsule badge for photo tags.
+ * Display sizing variations for tag badges.
+ */
+enum class TagDisplaySize {
+    THIN_MICRO,
+    STANDARD,
+    COLOR_DOT
+}
+
+/**
+ * High-end customizable capsule badge for photo tags.
  */
 @Composable
 fun TagBadge(
     normalizedName: String,
     displayName: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    displaySize: TagDisplaySize = TagDisplaySize.THIN_MICRO
 ) {
     val isDark = isSystemInDarkTheme()
     val colorResult = TagColor.getColorScheme(normalizedName, isDark)
@@ -33,30 +46,92 @@ fun TagBadge(
     val textColor = Color(colorResult.textArgb)
     val borderColor = textColor.copy(alpha = 0.28f)
 
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(bgColor)
-            .border(width = 0.75.dp, color = borderColor, shape = RoundedCornerShape(6.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "#",
-                color = textColor.copy(alpha = 0.65f),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                lineHeight = 11.sp
-            )
-            Text(
-                text = displayName,
-                color = textColor,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                lineHeight = 12.sp,
-                maxLines = 1
-            )
+    when (displaySize) {
+        TagDisplaySize.COLOR_DOT -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.65f))
+                    .border(width = 0.5.dp, color = Color.White.copy(alpha = 0.22f), shape = RoundedCornerShape(4.dp))
+                    .padding(horizontal = 4.dp, vertical = 1.5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(Color(colorResult.backgroundArgb))
+                    )
+                    Text(
+                        text = displayName,
+                        color = Color.White,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 10.sp,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+        TagDisplaySize.STANDARD -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(bgColor)
+                    .border(width = 0.75.dp, color = borderColor, shape = RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "#",
+                        color = textColor.copy(alpha = 0.65f),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 11.sp
+                    )
+                    Text(
+                        text = displayName,
+                        color = textColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 12.sp,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+        TagDisplaySize.THIN_MICRO -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(bgColor)
+                    .border(width = 0.5.dp, color = borderColor, shape = RoundedCornerShape(4.dp))
+                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "#",
+                        color = textColor.copy(alpha = 0.65f),
+                        fontSize = 7.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 9.sp
+                    )
+                    Text(
+                        text = displayName,
+                        color = textColor,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 10.sp,
+                        maxLines = 1
+                    )
+                }
+            }
         }
     }
 }

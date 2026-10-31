@@ -64,7 +64,9 @@ fun PhotoCell(
     isInSelectionMode: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    tagDisplaySize: TagDisplaySize = TagDisplaySize.THIN_MICRO,
+    aspectRatio: Float = 1f
 ) {
     val context = LocalContext.current
     val thumbFile = remember(photoWithTags.photo.thumbPath) {
@@ -100,10 +102,10 @@ fun PhotoCell(
     )
 
     val cellShape = RoundedCornerShape(12.dp)
+    val baseModifier = if (aspectRatio > 0f) modifier.aspectRatio(aspectRatio) else modifier
 
     Box(
-        modifier = modifier
-            .aspectRatio(1f)
+        modifier = baseModifier
             .scale(cellScale)
             .clip(cellShape)
             .border(
@@ -158,40 +160,46 @@ fun PhotoCell(
                     .background(TagShotGradients.bottomVignetteScrim)
             )
 
-            // Micro-capsule Tag Badges (up to 2 tags + "+N")
+            // Micro-capsule Tag Badges (fits 2-3+ tags cleanly based on tagDisplaySize)
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .padding(horizontal = 6.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val displayTags = photoWithTags.tags.take(2)
-                val remainingCount = photoWithTags.tags.size - 2
+                val maxTagsToShow = when (tagDisplaySize) {
+                    TagDisplaySize.THIN_MICRO -> 3
+                    TagDisplaySize.COLOR_DOT -> 4
+                    TagDisplaySize.STANDARD -> 2
+                }
+                val displayTags = photoWithTags.tags.take(maxTagsToShow)
+                val remainingCount = photoWithTags.tags.size - maxTagsToShow
 
                 for (tag in displayTags) {
                     TagBadge(
                         normalizedName = tag.normalizedName,
-                        displayName = tag.name
+                        displayName = tag.name,
+                        displaySize = tagDisplaySize
                     )
                 }
 
                 if (remainingCount > 0) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(Color.Black.copy(alpha = 0.75f))
-                            .border(0.75.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                            .border(0.5.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 1.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "+$remainingCount",
                             color = Color.White,
-                            fontSize = 9.sp,
+                            fontSize = if (tagDisplaySize == TagDisplaySize.THIN_MICRO) 7.5.sp else 8.5.sp,
                             fontWeight = FontWeight.Bold,
-                            lineHeight = 11.sp
+                            lineHeight = 10.sp
                         )
                     }
                 }

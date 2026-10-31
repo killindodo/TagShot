@@ -26,9 +26,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -38,6 +40,10 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.ViewModule
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.tagshot.app.ui.components.TagBadge
+import com.tagshot.app.ui.components.TagDisplaySize
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -99,6 +105,18 @@ fun SettingsScreen(
     val gridColumns by viewModel.gridColumns.collectAsState()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
     val themeMode by viewModel.themeModeFlow.collectAsState()
+    val viewingStyleStr by viewModel.viewingStyleFlow.collectAsState()
+    val tagDisplaySizeStr by viewModel.tagDisplaySizeFlow.collectAsState()
+    val showListFileSize by viewModel.showListFileSizeFlow.collectAsState()
+    val showListDate by viewModel.showListDateFlow.collectAsState()
+    val showListFolder by viewModel.showListFolderFlow.collectAsState()
+
+    val viewingStyle = remember(viewingStyleStr) {
+        try { ViewingStyle.valueOf(viewingStyleStr) } catch (_: Exception) { ViewingStyle.GRID }
+    }
+    val tagDisplaySize = remember(tagDisplaySizeStr) {
+        try { TagDisplaySize.valueOf(tagDisplaySizeStr) } catch (_: Exception) { TagDisplaySize.THIN_MICRO }
+    }
 
     val totalPhotos = (uiState as? MainUiState.Success)?.totalLibraryCount ?: 0
     val totalTags = (uiState as? MainUiState.Success)?.allTags?.size ?: 0
@@ -156,7 +174,41 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 1. Grid Density Section ---
+        // --- 1. Viewing Style Section ---
+        SectionHeader(title = "VIEWING STYLE & LAYOUT")
+        ViewingStyleCard(
+            selectedStyle = viewingStyle,
+            onSelectStyle = { viewModel.setViewingStyle(it) },
+            hapticsEnabled = hapticsEnabled
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- 2. Tag Badge Customization ---
+        SectionHeader(title = "TAG BADGE CUSTOMIZATION")
+        TagSizeCard(
+            selectedSize = tagDisplaySize,
+            onSelectSize = { viewModel.setTagDisplaySize(it) },
+            hapticsEnabled = hapticsEnabled
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- 3. Windows List Details Options ---
+        SectionHeader(title = "WINDOWS LIST DETAILS OPTIONS")
+        WindowsDetailsOptionsCard(
+            showFileSize = showListFileSize,
+            showDate = showListDate,
+            showFolder = showListFolder,
+            onToggleFileSize = { viewModel.setShowListFileSize(!showListFileSize) },
+            onToggleDate = { viewModel.setShowListDate(!showListDate) },
+            onToggleFolder = { viewModel.setShowListFolder(!showListFolder) },
+            hapticsEnabled = hapticsEnabled
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- 4. Grid Density Section ---
         SectionHeader(title = "GRID DENSITY")
         GridDensityCard(
             selectedColumns = gridColumns,
@@ -239,6 +291,340 @@ private fun SectionHeader(title: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
     )
+}
+
+@Composable
+private fun ViewingStyleCard(
+    selectedStyle: ViewingStyle,
+    onSelectStyle: (ViewingStyle) -> Unit,
+    hapticsEnabled: Boolean
+) {
+    val haptic = LocalHapticFeedback.current
+    val styles = listOf(
+        Triple(ViewingStyle.GRID, Icons.Default.GridView, "Grid"),
+        Triple(ViewingStyle.LIST_DETAILS, Icons.AutoMirrored.Filled.ViewList, "Windows List"),
+        Triple(ViewingStyle.MASONRY, Icons.Default.Dashboard, "Masonry")
+    )
+
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassBorder(shape = RoundedCornerShape(18.dp))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = "Default Gallery Layout",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+            )
+            Text(
+                text = "Choose between classic square grid, Windows File Explorer-style details list, or dynamic masonry",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                styles.forEach { (style, icon, label) ->
+                    val isSelected = selectedStyle == style
+                    val itemBg by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                        label = "styleBg"
+                    )
+                    val iconTint by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        label = "styleIconTint"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(itemBg)
+                            .border(
+                                width = if (isSelected) 1.5.dp else 0.5.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .bouncyClickable(
+                                hapticsEnabled = hapticsEnabled,
+                                onClick = {
+                                    if (hapticsEnabled) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    }
+                                    onSelectStyle(style)
+                                }
+                            )
+                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = label,
+                                tint = iconTint,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TagSizeCard(
+    selectedSize: TagDisplaySize,
+    onSelectSize: (TagDisplaySize) -> Unit,
+    hapticsEnabled: Boolean
+) {
+    val haptic = LocalHapticFeedback.current
+    val sizes = listOf(
+        Pair(TagDisplaySize.THIN_MICRO, "Thin / Micro"),
+        Pair(TagDisplaySize.STANDARD, "Standard"),
+        Pair(TagDisplaySize.COLOR_DOT, "Color Dot")
+    )
+
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassBorder(shape = RoundedCornerShape(18.dp))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = "Photo Card Tag Size",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+            )
+            Text(
+                text = "Thin / Micro fits 2-3 tags neatly on photos without obscuring the photo or getting hidden",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Selector Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                sizes.forEach { (size, label) ->
+                    val isSelected = selectedSize == size
+                    val itemBg by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                        label = "tagSizeBg"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(itemBg)
+                            .border(
+                                width = if (isSelected) 1.5.dp else 0.5.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .bouncyClickable(
+                                hapticsEnabled = hapticsEnabled,
+                                onClick = {
+                                    if (hapticsEnabled) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    }
+                                    onSelectSize(size)
+                                }
+                            )
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Interactive Live Preview Frame
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .border(0.75.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                    .padding(10.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "LIVE PREVIEW (3 TAGS ON SQUARE PHOTO)",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.6f),
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TagBadge(normalizedName = "vacation", displayName = "vacation", displaySize = selectedSize)
+                        TagBadge(normalizedName = "nature", displayName = "nature", displaySize = selectedSize)
+                        TagBadge(normalizedName = "sunset", displayName = "sunset", displaySize = selectedSize)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WindowsDetailsOptionsCard(
+    showFileSize: Boolean,
+    showDate: Boolean,
+    showFolder: Boolean,
+    onToggleFileSize: () -> Unit,
+    onToggleDate: () -> Unit,
+    onToggleFolder: () -> Unit,
+    hapticsEnabled: Boolean
+) {
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassBorder(shape = RoundedCornerShape(18.dp))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = "Details List Row Columns",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+            )
+            Text(
+                text = "Configure metadata elements visible in the Windows File Explorer details view",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Toggle 1: File Size & Dimensions
+            SettingToggleRow(
+                title = "File Size & Dimensions",
+                description = "Shows image storage size (e.g. 2.4 MB) and resolution",
+                checked = showFileSize,
+                onCheckedChange = { onToggleFileSize() },
+                hapticsEnabled = hapticsEnabled
+            )
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+
+            // Toggle 2: Date & Timestamp
+            SettingToggleRow(
+                title = "Timestamp",
+                description = "Shows photo capture or import date & time",
+                checked = showDate,
+                onCheckedChange = { onToggleDate() },
+                hapticsEnabled = hapticsEnabled
+            )
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+
+            // Toggle 3: Folder Location
+            SettingToggleRow(
+                title = "Folder Location Pill",
+                description = "Shows the source album or directory pill next to the title",
+                checked = showFolder,
+                onCheckedChange = { onToggleFolder() },
+                hapticsEnabled = hapticsEnabled
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingToggleRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    hapticsEnabled: Boolean
+) {
+    val haptic = LocalHapticFeedback.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 12.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = {
+                if (hapticsEnabled) {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+                onCheckedChange(it)
+            },
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        )
+    }
 }
 
 @Composable
