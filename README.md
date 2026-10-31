@@ -13,6 +13,12 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" /></a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/killindodo/TagShot/releases/download/v1.2.0/tagshot-v1.2.0.apk">
+    <img src="https://img.shields.io/badge/Download_APK-v1.2.0-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" />
+  </a>
+</p>
+
 > Developed with ❤️ by **[killindodo](https://github.com/killindodo)**.
 
 TagShot is a native, offline, privacy-first Android photo indexing and visual management application. Built from scratch with **Kotlin**, **Jetpack Compose**, and **Room SQLite**, it enables instant multi-token search, customizable tag styling, multi-system UI theming, and perceptual duplicate detection without requiring storage, camera, or internet permissions.
@@ -88,6 +94,11 @@ pkg install -y openjdk-17 git curl unzip aapt2 android-tools
 ```
 
 ### Installation
+
+#### Direct Download
+- 📲 **[Download TagShot v1.2.0 APK](https://github.com/killindodo/TagShot/releases/download/v1.2.0/tagshot-v1.2.0.apk)** *(Ready to install, Android 8.0+)*
+
+#### Via ADB
 Install directly to your device via ADB:
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
