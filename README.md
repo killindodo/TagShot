@@ -1,15 +1,33 @@
-# TagShot
+<p align="center">
+  <img src="assets/icon.png" width="128" height="128" alt="TagShot Logo" />
+  <h1 align="center">TagShot</h1>
+</p>
 
-[![Author](https://img.shields.io/badge/Author-killindodo-blue.svg)](https://github.com/killindodo)
-[![Platform](https://img.shields.io/badge/Platform-Android_8.0+-green.svg)](https://developer.android.com)
-[![Language](https://img.shields.io/badge/Language-Kotlin_1.9.24-purple.svg)](https://kotlinlang.org)
-[![UI](https://img.shields.io/badge/UI-Jetpack_Compose_BOM-red.svg)](https://developer.android.com/jetpack/compose)
-[![Database](https://img.shields.io/badge/Database-Room_SQLite_2.6.1-orange.svg)](https://developer.android.com/training/data-storage/room)
-[![Unit Tests](https://img.shields.io/badge/Unit_Tests-99_Passed-brightgreen.svg)]()
+<p align="center">
+  <a href="https://github.com/killindodo"><img src="https://img.shields.io/badge/Author-killindodo-blue.svg" alt="Author" /></a>
+  <a href="https://developer.android.com"><img src="https://img.shields.io/badge/Platform-Android_8.0+-green.svg" alt="Platform" /></a>
+  <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Language-Kotlin_1.9.24-purple.svg" alt="Language" /></a>
+  <a href="https://developer.android.com/jetpack/compose"><img src="https://img.shields.io/badge/UI-Jetpack_Compose_BOM-red.svg" alt="UI" /></a>
+  <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Database-Room_SQLite_2.6.1-orange.svg" alt="Database" /></a>
+  <img src="https://img.shields.io/badge/Unit_Tests-99_Passed-brightgreen.svg" alt="Tests" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" /></a>
+</p>
 
 > Developed with ❤️ by **[killindodo](https://github.com/killindodo)**.
 
 TagShot is a native, offline, privacy-first Android photo indexing and visual management application. Built from scratch with **Kotlin**, **Jetpack Compose**, and **Room SQLite**, it enables instant multi-token search, customizable tag styling, multi-system UI theming, and perceptual duplicate detection without requiring storage, camera, or internet permissions.
+
+---
+
+## Screenshots
+
+| UI Design Systems (6 Dynamic Paradigms) | Tag Shape & Scrubber Customizer |
+| :---: | :---: |
+| <img src="assets/screenshots/01_ui_design_systems.png" width="340" /> | <img src="assets/screenshots/02_tag_and_scrubber_customizer.png" width="340" /> |
+
+| Duplicate Finder & Storage Manager | Date Range Filtering & Presets |
+| :---: | :---: |
+| <img src="assets/screenshots/03_duplicate_finder_overview.png" width="340" /> | <img src="assets/screenshots/04_date_range_filter.png" width="340" /> |
 
 ---
 
