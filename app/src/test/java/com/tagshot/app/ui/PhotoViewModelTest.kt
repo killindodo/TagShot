@@ -618,4 +618,76 @@ class PhotoViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun settingsTabSelection_persistedAndReflectedInUiState() = runTest(testDispatcher) {
+        val handle = SavedStateHandle()
+        val viewModel = PhotoViewModel(repository, handle, testDispatcher)
+
+        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+        advanceUntilIdle()
+
+        var state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(MainTab.ALL_PHOTOS, state.activeTab)
+
+        viewModel.onTabSelected(MainTab.SETTINGS)
+        advanceUntilIdle()
+
+        state = viewModel.uiState.value as MainUiState.Success
+        assertEquals(MainTab.SETTINGS, state.activeTab)
+        assertEquals(MainTab.SETTINGS.name, viewModel.activeTabFlow.value)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun gridColumnsPreference_persistedAndUpdated() = runTest(testDispatcher) {
+        val handle = SavedStateHandle()
+        val viewModel = PhotoViewModel(repository, handle, testDispatcher)
+
+        assertEquals(2, viewModel.gridColumns.value)
+
+        viewModel.setGridColumns(3)
+        assertEquals(3, viewModel.gridColumns.value)
+
+        viewModel.setGridColumns(1)
+        assertEquals(1, viewModel.gridColumns.value)
+
+        // Clamping check
+        viewModel.setGridColumns(0)
+        assertEquals(1, viewModel.gridColumns.value)
+
+        viewModel.setGridColumns(5)
+        assertEquals(4, viewModel.gridColumns.value)
+    }
+
+    @Test
+    fun hapticsPreference_persistedAndUpdated() = runTest(testDispatcher) {
+        val handle = SavedStateHandle()
+        val viewModel = PhotoViewModel(repository, handle, testDispatcher)
+
+        assertTrue(viewModel.hapticsEnabled.value)
+
+        viewModel.setHapticsEnabled(false)
+        assertFalse(viewModel.hapticsEnabled.value)
+
+        viewModel.setHapticsEnabled(true)
+        assertTrue(viewModel.hapticsEnabled.value)
+    }
+
+    @Test
+    fun themeModePreference_persistedAndUpdated() = runTest(testDispatcher) {
+        val handle = SavedStateHandle()
+        val viewModel = PhotoViewModel(repository, handle, testDispatcher)
+
+        assertEquals("SYSTEM", viewModel.themeModeFlow.value)
+
+        viewModel.setThemeMode("DARK")
+        assertEquals("DARK", viewModel.themeModeFlow.value)
+
+        viewModel.setThemeMode("LIGHT")
+        assertEquals("LIGHT", viewModel.themeModeFlow.value)
+    }
 }

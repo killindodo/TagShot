@@ -37,7 +37,8 @@ import java.io.File
 
 enum class MainTab {
     ALL_PHOTOS,
-    FOLDER_WISE
+    FOLDER_WISE,
+    SETTINGS
 }
 
 data class FolderItem(
@@ -97,6 +98,9 @@ class PhotoViewModel(
         private const val KEY_SORT_ORDER = "key_sort_order"
         private const val KEY_ACTIVE_TAB = "key_active_tab"
         private const val KEY_SELECTED_FOLDER = "key_selected_folder"
+        private const val KEY_GRID_COLUMNS = "key_grid_columns"
+        private const val KEY_HAPTICS_ENABLED = "key_haptics_enabled"
+        private const val KEY_THEME_MODE = "key_theme_mode"
     }
 
     // Persisted state via SavedStateHandle
@@ -106,6 +110,21 @@ class PhotoViewModel(
     val sortOrderFlow = savedStateHandle.getStateFlow(KEY_SORT_ORDER, SortOrder.NEWEST.name)
     val activeTabFlow = savedStateHandle.getStateFlow(KEY_ACTIVE_TAB, MainTab.ALL_PHOTOS.name)
     val selectedFolderFlow = savedStateHandle.getStateFlow(KEY_SELECTED_FOLDER, "")
+    val gridColumns: StateFlow<Int> = savedStateHandle.getStateFlow(KEY_GRID_COLUMNS, 2)
+    val hapticsEnabled: StateFlow<Boolean> = savedStateHandle.getStateFlow(KEY_HAPTICS_ENABLED, true)
+    val themeModeFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_THEME_MODE, "SYSTEM")
+
+    fun setGridColumns(cols: Int) {
+        savedStateHandle[KEY_GRID_COLUMNS] = cols.coerceIn(1, 4)
+    }
+
+    fun setHapticsEnabled(enabled: Boolean) {
+        savedStateHandle[KEY_HAPTICS_ENABLED] = enabled
+    }
+
+    fun setThemeMode(mode: String) {
+        savedStateHandle[KEY_THEME_MODE] = mode
+    }
 
     // Selection mode state
     private val _selectedPhotoIds = MutableStateFlow<Set<Long>>(emptySet())

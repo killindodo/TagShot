@@ -16,12 +16,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -92,6 +95,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.core.content.FileProvider
 import com.tagshot.app.domain.SortOrder
+import com.tagshot.app.ui.components.BottomPillNavDock
 import com.tagshot.app.ui.components.PhotoCell
 import java.io.File
 import java.util.UUID
@@ -106,19 +110,25 @@ fun MainScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val selectedPhotoIds by viewModel.selectedPhotoIds.collectAsState()
+    val gridColumns by viewModel.gridColumns.collectAsState()
+    val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    val currentTab = (uiState as? MainUiState.Success)?.activeTab ?: MainTab.ALL_PHOTOS
     val isInSelectionMode = selectedPhotoIds.isNotEmpty()
     val isInsideFolder = (uiState as? MainUiState.Success)?.let {
         it.activeTab == MainTab.FOLDER_WISE && it.selectedFolder.isNotEmpty()
     } == true
+    val isSettingsTab = currentTab == MainTab.SETTINGS
 
-    // Back button exits selection mode first per Section 9.1; if inside folder, returns to folders list
-    BackHandler(enabled = isInSelectionMode || isInsideFolder) {
+    // Back button exits selection mode first per Section 9.1; if inside folder, returns to folders list; if on settings, returns to gallery
+    BackHandler(enabled = isInSelectionMode || isInsideFolder || isSettingsTab) {
         if (isInSelectionMode) {
             viewModel.clearSelection()
         } else if (isInsideFolder) {
             viewModel.onFolderSelected("")
+        } else if (isSettingsTab) {
+            viewModel.onTabSelected(MainTab.ALL_PHOTOS)
         }
     }
 
@@ -197,39 +207,23 @@ fun MainScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             if (isInSelectionMode) {
-                TopAppBar(
-                    title = { Text("${selectedPhotoIds.size} selected") },
-                    navigationIcon = {
-                        IconButton(onClick = { viewModel.clearSelection() }) {
-                            Icon(Icons.Default.Close, contentDescription = "Exit selection")
-                        }
+                SelectionTopBar(
+                    selectedCount = selectedPhotoIds.size,
+                    onClearSelection = { viewModel.clearSelection() },
+                    onBulkAddTag = { showBulkAddTagDialog = true },
+                    onBulkRemoveTag = { showBulkRemoveTagDialog = true },
+                    onShare = {
+                        val photos = (uiState as? MainUiState.Success)?.photos
+                            ?.filter { selectedPhotoIds.contains(it.photo.id) }
+                            ?: emptyList()
+                        sharePhotos(context, photos.map { it.photo.originalPath })
                     },
-                    actions = {
-                        IconButton(onClick = { showBulkAddTagDialog = true }) {
-                            Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Add tags to selected")
-                        }
-                        IconButton(onClick = { showBulkRemoveTagDialog = true }) {
-                            Icon(Icons.AutoMirrored.Filled.LabelOff, contentDescription = "Remove tag from selected")
-                        }
-                        IconButton(onClick = {
-                            val photos = (uiState as? MainUiState.Success)?.photos
-                                ?.filter { selectedPhotoIds.contains(it.photo.id) }
-                                ?: emptyList()
-                            sharePhotos(context, photos.map { it.photo.originalPath })
-                        }) {
-                            Icon(Icons.Default.Share, contentDescription = "Share selected")
-                        }
-                        IconButton(onClick = { showDeleteConfirmation = true }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete selected")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+                    onDelete = { showDeleteConfirmation = true }
                 )
-            } else {
+            } else if (currentTab != MainTab.SETTINGS) {
                 MainTopBar(
                     viewModel = viewModel,
                     onNavigateToTagManager = onNavigateToTagManager,
@@ -238,7 +232,7 @@ fun MainScreen(
             }
         },
         floatingActionButton = {
-            if (!isInSelectionMode) {
+            if (!isInSelectionMode && currentTab != MainTab.SETTINGS) {
                 MainFab(
                     onCameraClick = {
                         try {
@@ -261,182 +255,202 @@ fun MainScreen(
                     },
                     onFolderClick = {
                         folderPickerLauncher.launch(null)
-                    }
+                    },
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(bottom = 72.dp)
                 )
             }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(bottom = 80.dp)
+            )
+        }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when (val state = uiState) {
-                is MainUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                is MainUiState.Success -> {
-                    // Non-blocking Import Progress Bar
-                    if (state.isImporting) {
-                        val progress = state.importProgress
-                        if (progress != null && progress.total > 0) {
-                            LinearProgressIndicator(
-                                progress = { progress.done.toFloat() / progress.total },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        } else {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                when (val state = uiState) {
+                    is MainUiState.Loading -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
                         }
                     }
-
-                    // Navigation Tabs: All Photos vs Folder Wise View
-                    TabRow(
-                        selectedTabIndex = if (state.activeTab == MainTab.ALL_PHOTOS) 0 else 1,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Tab(
-                            selected = state.activeTab == MainTab.ALL_PHOTOS,
-                            onClick = { viewModel.onTabSelected(MainTab.ALL_PHOTOS) },
-                            text = { Text("All Photos") }
-                        )
-                        Tab(
-                            selected = state.activeTab == MainTab.FOLDER_WISE,
-                            onClick = { viewModel.onTabSelected(MainTab.FOLDER_WISE) },
-                            text = { Text("Folder Wise View") }
-                        )
-                    }
-
-                    if (state.activeTab == MainTab.FOLDER_WISE) {
-                        if (state.selectedFolder.isEmpty()) {
-                            // Viewing all folders as cards/grid
-                            if (state.allFolders.isEmpty()) {
-                                EmptyFolderView(onSelectFolder = { folderPickerLauncher.launch(null) })
+                    is MainUiState.Success -> {
+                        // Non-blocking Import Progress Bar
+                        if (state.isImporting) {
+                            val progress = state.importProgress
+                            if (progress != null && progress.total > 0) {
+                                LinearProgressIndicator(
+                                    progress = { progress.done.toFloat() / progress.total },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             } else {
-                                FolderGridView(
-                                    folders = state.allFolders,
-                                    onFolderClick = { folder ->
-                                        viewModel.onFolderSelected(folder.name)
-                                    },
-                                    onSelectNewFolder = { folderPickerLauncher.launch(null) }
+                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            }
+                        }
+
+                        when (state.activeTab) {
+                            MainTab.SETTINGS -> {
+                                SettingsScreen(
+                                    viewModel = viewModel,
+                                    onNavigateToTagManager = onNavigateToTagManager,
+                                    onShowMessage = { msg -> viewModel.showMessage(msg) },
+                                    modifier = Modifier.statusBarsPadding()
                                 )
                             }
-                        } else {
-                            // Viewing pictures inside the selected folder
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                IconButton(onClick = { viewModel.onFolderSelected("") }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to folders")
-                                }
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = state.selectedFolder,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                            MainTab.FOLDER_WISE -> {
+                                if (state.selectedFolder.isEmpty()) {
+                                    // Viewing all folders as cards/grid
+                                    if (state.allFolders.isEmpty()) {
+                                        EmptyFolderView(onSelectFolder = { folderPickerLauncher.launch(null) })
+                                    } else {
+                                        FolderGridView(
+                                            folders = state.allFolders,
+                                            onFolderClick = { folder ->
+                                                viewModel.onFolderSelected(folder.name)
+                                            },
+                                            onSelectNewFolder = { folderPickerLauncher.launch(null) }
+                                        )
+                                    }
+                                } else {
+                                    // Viewing pictures inside the selected folder
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        IconButton(onClick = { viewModel.onFolderSelected("") }) {
+                                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to folders")
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = state.selectedFolder,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "${state.photos.size} photo(s)",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+
+                                    // Tag Filter Chips Row for photos in this folder
+                                    TagChipsRow(
+                                        viewModel = viewModel,
+                                        state = state
                                     )
-                                    Text(
-                                        text = "${state.photos.size} photo(s)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+
+                                    if (state.photos.isEmpty()) {
+                                        EmptyFilterView(onClearFilters = { viewModel.onClearFilters() })
+                                    } else {
+                                        LazyVerticalGrid(
+                                            columns = GridCells.Fixed(gridColumns),
+                                            contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 96.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            items(
+                                                items = state.photos,
+                                                key = { it.photo.id },
+                                                contentType = { "photo" }
+                                            ) { item ->
+                                                PhotoCell(
+                                                    photoWithTags = item,
+                                                    isSelected = selectedPhotoIds.contains(item.photo.id),
+                                                    isInSelectionMode = isInSelectionMode,
+                                                    onClick = {
+                                                        if (isInSelectionMode) {
+                                                            viewModel.toggleSelection(item.photo.id)
+                                                        } else {
+                                                            onNavigateToDetail(item.photo.id)
+                                                        }
+                                                    },
+                                                    onLongClick = {
+                                                        if (!isInSelectionMode) {
+                                                            viewModel.enterSelection(item.photo.id)
+                                                        }
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
+                            MainTab.ALL_PHOTOS -> {
+                                TagChipsRow(
+                                    viewModel = viewModel,
+                                    state = state
+                                )
 
-                            // Tag Filter Chips Row for photos in this folder
-                            TagChipsRow(
-                                viewModel = viewModel,
-                                state = state
-                            )
-
-                            if (state.photos.isEmpty()) {
-                                EmptyFilterView(onClearFilters = { viewModel.onClearFilters() })
-                            } else {
-                                LazyVerticalGrid(
-                                    columns = GridCells.Adaptive(minSize = 110.dp),
-                                    contentPadding = PaddingValues(8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    items(
-                                        items = state.photos,
-                                        key = { it.photo.id },
-                                        contentType = { "photo" }
-                                    ) { item ->
-                                        PhotoCell(
-                                            photoWithTags = item,
-                                            isSelected = selectedPhotoIds.contains(item.photo.id),
-                                            isInSelectionMode = isInSelectionMode,
-                                            onClick = {
-                                                if (isInSelectionMode) {
-                                                    viewModel.toggleSelection(item.photo.id)
-                                                } else {
-                                                    onNavigateToDetail(item.photo.id)
+                                if (state.totalLibraryCount == 0) {
+                                    EmptyLibraryView()
+                                } else if (state.photos.isEmpty()) {
+                                    EmptyFilterView(onClearFilters = { viewModel.onClearFilters() })
+                                } else {
+                                    LazyVerticalGrid(
+                                        columns = GridCells.Fixed(gridColumns),
+                                        contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 96.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        items(
+                                            items = state.photos,
+                                            key = { it.photo.id },
+                                            contentType = { "photo" }
+                                        ) { item ->
+                                            PhotoCell(
+                                                photoWithTags = item,
+                                                isSelected = selectedPhotoIds.contains(item.photo.id),
+                                                isInSelectionMode = isInSelectionMode,
+                                                onClick = {
+                                                    if (isInSelectionMode) {
+                                                        viewModel.toggleSelection(item.photo.id)
+                                                    } else {
+                                                        onNavigateToDetail(item.photo.id)
+                                                    }
+                                                },
+                                                onLongClick = {
+                                                    if (!isInSelectionMode) {
+                                                        viewModel.enterSelection(item.photo.id)
+                                                    }
                                                 }
-                                            },
-                                            onLongClick = {
-                                                if (!isInSelectionMode) {
-                                                    viewModel.enterSelection(item.photo.id)
-                                                }
-                                            }
-                                        )
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    } else {
-                        // ALL_PHOTOS Tab
-                        TagChipsRow(
-                            viewModel = viewModel,
-                            state = state
-                        )
-
-                        if (state.totalLibraryCount == 0) {
-                            EmptyLibraryView()
-                        } else if (state.photos.isEmpty()) {
-                            EmptyFilterView(onClearFilters = { viewModel.onClearFilters() })
-                        } else {
-                            LazyVerticalGrid(
-                                columns = GridCells.Adaptive(minSize = 110.dp),
-                                contentPadding = PaddingValues(8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                items(
-                                    items = state.photos,
-                                    key = { it.photo.id },
-                                    contentType = { "photo" }
-                                ) { item ->
-                                    PhotoCell(
-                                        photoWithTags = item,
-                                        isSelected = selectedPhotoIds.contains(item.photo.id),
-                                        isInSelectionMode = isInSelectionMode,
-                                        onClick = {
-                                            if (isInSelectionMode) {
-                                                viewModel.toggleSelection(item.photo.id)
-                                            } else {
-                                                onNavigateToDetail(item.photo.id)
-                                            }
-                                        },
-                                        onLongClick = {
-                                            if (!isInSelectionMode) {
-                                                viewModel.enterSelection(item.photo.id)
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
+            }
+
+            // Floating Bottom Pill Navigation Dock
+            if (!isInSelectionMode) {
+                BottomPillNavDock(
+                    activeTab = currentTab,
+                    onTabSelected = { viewModel.onTabSelected(it) },
+                    hapticsEnabled = hapticsEnabled,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 12.dp)
+                )
             }
         }
     }
@@ -548,6 +562,45 @@ fun MainScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun SelectionTopBar(
+    selectedCount: Int,
+    onClearSelection: () -> Unit,
+    onBulkAddTag: () -> Unit,
+    onBulkRemoveTag: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit
+) {
+    TopAppBar(
+        title = { Text("$selectedCount selected") },
+        navigationIcon = {
+            IconButton(onClick = onClearSelection) {
+                Icon(Icons.Default.Close, contentDescription = "Exit selection")
+            }
+        },
+        actions = {
+            IconButton(onClick = onBulkAddTag) {
+                Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Add tags to selected")
+            }
+            IconButton(onClick = onBulkRemoveTag) {
+                Icon(Icons.AutoMirrored.Filled.LabelOff, contentDescription = "Remove tag from selected")
+            }
+            IconButton(onClick = onShare) {
+                Icon(Icons.Default.Share, contentDescription = "Share selected")
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete selected")
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        ),
+        windowInsets = WindowInsets(0, 0, 0, 0),
+        modifier = Modifier.statusBarsPadding()
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun MainTopBar(
     viewModel: PhotoViewModel,
     onNavigateToTagManager: () -> Unit,
@@ -560,7 +613,12 @@ private fun MainTopBar(
 
     val currentSort = try { SortOrder.valueOf(sortOrderName) } catch (_: Exception) { SortOrder.NEWEST }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -699,13 +757,15 @@ private fun TagChipsRow(
 private fun MainFab(
     onCameraClick: () -> Unit,
     onGalleryClick: () -> Unit,
-    onFolderClick: () -> Unit
+    onFolderClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     Column(
         horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
     ) {
         AnimatedVisibility(visible = expanded) {
             Column(
@@ -801,7 +861,7 @@ private fun FolderGridView(
 
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 140.dp),
-            contentPadding = PaddingValues(12.dp),
+            contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 96.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize()

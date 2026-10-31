@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Primary Pro Sparkle Star (Amber Gold) -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M10,1.5 C10,7.5 14,12.5 19.5,12.5 C14,12.5 10,17.5 10,23.5 C10,17.5 6,12.5 0.5,12.5 C6,12.5 10,7.5 10,1.5 Z" />
+
+    <!-- Secondary Satellite Sparkle Star (Sapphire Blue) -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M19,1.5 C19,3.5 20.3,4.8 22.5,4.8 C20.3,4.8 19,6.1 19,8.1 C19,6.1 17.7,4.8 15.5,4.8 C17.7,4.8 19,3.5 19,1.5 Z" />
+
+    <!-- Tertiary Ambient Micro Sparkle (Radiant Violet) -->
+    <path
+        android:fillColor="#A78BFA"
+        android:pathData="M4.5,18 C4.5,19 5.2,19.7 6.2,19.7 C5.2,19.7 4.5,20.4 4.5,21.4 C4.5,20.4 3.8,19.7 2.8,19.7 C3.8,19.7 4.5,19 4.5,18 Z" />
+
+</vector>
