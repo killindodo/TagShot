@@ -27,6 +27,7 @@ import com.tagshot.app.ui.PhotoViewModel
 import com.tagshot.app.ui.TagManagerScreen
 import com.tagshot.app.ui.theme.AccentPalette
 import com.tagshot.app.ui.theme.TagShotTheme
+import com.tagshot.app.ui.theme.UiDesignSystem
 
 class MainActivity : ComponentActivity() {
 
@@ -50,6 +51,10 @@ class MainActivity : ComponentActivity() {
             val accentPalette = remember(accentPaletteStr) {
                 AccentPalette.fromNameOrDefault(accentPaletteStr)
             }
+            val uiDesignSystemStr by viewModel.uiDesignSystemFlow.collectAsState()
+            val uiDesignSystem = remember(uiDesignSystemStr) {
+                UiDesignSystem.fromNameOrDefault(uiDesignSystemStr)
+            }
             val isDarkTheme = when (themeMode) {
                 "DARK" -> true
                 "LIGHT" -> false
@@ -57,7 +62,8 @@ class MainActivity : ComponentActivity() {
             }
             TagShotTheme(
                 darkTheme = isDarkTheme,
-                accentPalette = accentPalette
+                accentPalette = accentPalette,
+                uiDesignSystem = uiDesignSystem
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),

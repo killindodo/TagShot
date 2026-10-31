@@ -117,6 +117,13 @@ import com.tagshot.app.ui.components.StickyTimelineHeaderOverlay
 import com.tagshot.app.ui.components.TagDisplaySize
 import com.tagshot.app.ui.components.WindowsDetailsRow
 import com.tagshot.app.ui.components.pinchZoomGrid
+import com.tagshot.app.ui.theme.ScrubberBubbleStyle
+import com.tagshot.app.ui.theme.ScrubberStyle
+import com.tagshot.app.ui.theme.ScrubberWidth
+import com.tagshot.app.ui.theme.TagAnimation
+import com.tagshot.app.ui.theme.TagPalettePreset
+import com.tagshot.app.ui.theme.TagPosition
+import com.tagshot.app.ui.theme.TagShape
 import java.io.File
 import java.util.UUID
 
@@ -137,6 +144,13 @@ fun MainScreen(
     val showListFileSize by viewModel.showListFileSizeFlow.collectAsState()
     val showListDate by viewModel.showListDateFlow.collectAsState()
     val showListFolder by viewModel.showListFolderFlow.collectAsState()
+    val tagShapeStr by viewModel.tagShapeFlow.collectAsState()
+    val tagPositionStr by viewModel.tagPositionFlow.collectAsState()
+    val tagPresetStr by viewModel.tagPalettePresetFlow.collectAsState()
+    val tagAnimationStr by viewModel.tagAnimationFlow.collectAsState()
+    val scrubberStyleStr by viewModel.scrubberStyleFlow.collectAsState()
+    val scrubberWidthStr by viewModel.scrubberWidthFlow.collectAsState()
+    val scrubberBubbleStyleStr by viewModel.scrubberBubbleStyleFlow.collectAsState()
 
     val viewingStyle = remember(viewingStyleStr) {
         try { ViewingStyle.valueOf(viewingStyleStr) } catch (_: Exception) { ViewingStyle.GRID }
@@ -144,6 +158,13 @@ fun MainScreen(
     val tagDisplaySize = remember(tagDisplaySizeStr) {
         try { TagDisplaySize.valueOf(tagDisplaySizeStr) } catch (_: Exception) { TagDisplaySize.THIN_MICRO }
     }
+    val tagShape = remember(tagShapeStr) { TagShape.fromNameOrDefault(tagShapeStr) }
+    val tagPosition = remember(tagPositionStr) { TagPosition.fromNameOrDefault(tagPositionStr) }
+    val tagPreset = remember(tagPresetStr) { TagPalettePreset.fromNameOrDefault(tagPresetStr) }
+    val tagAnimation = remember(tagAnimationStr) { TagAnimation.fromNameOrDefault(tagAnimationStr) }
+    val scrubberStyle = remember(scrubberStyleStr) { ScrubberStyle.fromNameOrDefault(scrubberStyleStr) }
+    val scrubberWidth = remember(scrubberWidthStr) { ScrubberWidth.fromNameOrDefault(scrubberWidthStr) }
+    val scrubberBubbleStyle = remember(scrubberBubbleStyleStr) { ScrubberBubbleStyle.fromNameOrDefault(scrubberBubbleStyleStr) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val currentTab by remember(uiState) {
@@ -404,6 +425,13 @@ fun MainScreen(
                                             viewingStyle = viewingStyle,
                                             gridColumns = gridColumns,
                                             tagDisplaySize = tagDisplaySize,
+                                            tagShape = tagShape,
+                                            tagPosition = tagPosition,
+                                            tagPreset = tagPreset,
+                                            tagAnimation = tagAnimation,
+                                            scrubberStyle = scrubberStyle,
+                                            scrubberWidth = scrubberWidth,
+                                            scrubberBubbleStyle = scrubberBubbleStyle,
                                             showListFileSize = showListFileSize,
                                             showListDate = showListDate,
                                             showListFolder = showListFolder,
@@ -444,6 +472,13 @@ fun MainScreen(
                                         viewingStyle = viewingStyle,
                                         gridColumns = gridColumns,
                                         tagDisplaySize = tagDisplaySize,
+                                        tagShape = tagShape,
+                                        tagPosition = tagPosition,
+                                        tagPreset = tagPreset,
+                                        tagAnimation = tagAnimation,
+                                        scrubberStyle = scrubberStyle,
+                                        scrubberWidth = scrubberWidth,
+                                        scrubberBubbleStyle = scrubberBubbleStyle,
                                         showListFileSize = showListFileSize,
                                         showListDate = showListDate,
                                         showListFolder = showListFolder,
@@ -1107,6 +1142,13 @@ private fun PhotoCollectionView(
     viewingStyle: ViewingStyle,
     gridColumns: Int,
     tagDisplaySize: TagDisplaySize,
+    tagShape: TagShape = TagShape.SQUIRCLE,
+    tagPosition: TagPosition = TagPosition.BOTTOM_LEFT,
+    tagPreset: TagPalettePreset = TagPalettePreset.DYNAMIC_AUTO,
+    tagAnimation: TagAnimation = TagAnimation.NONE,
+    scrubberStyle: ScrubberStyle = ScrubberStyle.CUPERTINO_CAPSULE,
+    scrubberWidth: ScrubberWidth = ScrubberWidth.STANDARD,
+    scrubberBubbleStyle: ScrubberBubbleStyle = ScrubberBubbleStyle.FROSTED_GLASS_LENS,
     showListFileSize: Boolean,
     showListDate: Boolean,
     showListFolder: Boolean,
@@ -1154,6 +1196,10 @@ private fun PhotoCollectionView(
                                 isSelected = selectedPhotoIds.contains(item.photo.id),
                                 isInSelectionMode = isInSelectionMode,
                                 tagDisplaySize = tagDisplaySize,
+                                tagShape = tagShape,
+                                tagPosition = tagPosition,
+                                tagPreset = tagPreset,
+                                tagAnimation = tagAnimation,
                                 aspectRatio = 1f,
                                 onClick = { onPhotoClick(item.photo.id) },
                                 onLongClick = { onPhotoLongClick(item.photo.id) },
@@ -1178,6 +1224,9 @@ private fun PhotoCollectionView(
                     FastScrollScrubber(
                         gridState = gridState,
                         photos = photos,
+                        scrubberStyle = scrubberStyle,
+                        scrubberWidth = scrubberWidth,
+                        scrubberBubbleStyle = scrubberBubbleStyle,
                         modifier = Modifier.align(Alignment.CenterEnd)
                     )
                 }
@@ -1221,6 +1270,9 @@ private fun PhotoCollectionView(
                     FastScrollScrubber(
                         listState = listState,
                         photos = photos,
+                        scrubberStyle = scrubberStyle,
+                        scrubberWidth = scrubberWidth,
+                        scrubberBubbleStyle = scrubberBubbleStyle,
                         modifier = Modifier.align(Alignment.CenterEnd)
                     )
                 }
@@ -1253,6 +1305,10 @@ private fun PhotoCollectionView(
                                 isSelected = selectedPhotoIds.contains(item.photo.id),
                                 isInSelectionMode = isInSelectionMode,
                                 tagDisplaySize = tagDisplaySize,
+                                tagShape = tagShape,
+                                tagPosition = tagPosition,
+                                tagPreset = tagPreset,
+                                tagAnimation = tagAnimation,
                                 aspectRatio = ratio,
                                 onClick = { onPhotoClick(item.photo.id) },
                                 onLongClick = { onPhotoLongClick(item.photo.id) }
@@ -1271,6 +1327,9 @@ private fun PhotoCollectionView(
                     FastScrollScrubber(
                         staggeredGridState = staggeredGridState,
                         photos = photos,
+                        scrubberStyle = scrubberStyle,
+                        scrubberWidth = scrubberWidth,
+                        scrubberBubbleStyle = scrubberBubbleStyle,
                         modifier = Modifier.align(Alignment.CenterEnd)
                     )
                 }

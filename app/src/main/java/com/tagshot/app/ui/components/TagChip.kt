@@ -1,5 +1,12 @@
 package com.tagshot.app.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -7,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -15,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,10 +31,16 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tagshot.app.domain.TagColor
+import com.tagshot.app.ui.theme.TagAnimation
+import com.tagshot.app.ui.theme.TagPalettePreset
+import com.tagshot.app.ui.theme.TagShape
+import kotlin.math.roundToInt
 
 /**
  * Display sizing variations for tag badges.
@@ -38,34 +53,103 @@ enum class TagDisplaySize {
 
 /**
  * Jewelry-grade floating micro-pill badge for photo tags.
- * Features 0.5dp directional specular glow borders, precision typography,
- * subtle micro-shadow elevation, and luminous color radiance.
+ * Features customizable shapes, color presets, moving animations (pulse, shimmer, drift),
+ * 0.5dp directional specular glow borders, and luminous color radiance.
  */
 @Composable
 fun TagBadge(
     normalizedName: String,
     displayName: String,
     modifier: Modifier = Modifier,
-    displaySize: TagDisplaySize = TagDisplaySize.THIN_MICRO
+    displaySize: TagDisplaySize = TagDisplaySize.THIN_MICRO,
+    tagShape: TagShape = TagShape.SQUIRCLE,
+    tagPreset: TagPalettePreset = TagPalettePreset.DYNAMIC_AUTO,
+    tagAnimation: TagAnimation = TagAnimation.NONE
 ) {
     val isDark = isSystemInDarkTheme()
-    val colorResult = TagColor.getColorScheme(normalizedName, isDark)
-    val baseBgColor = Color(colorResult.backgroundArgb)
-    val textColor = Color(colorResult.textArgb)
+
+    // Determine colors based on preset vs dynamic auto
+    val (baseBgColor, textColor, highlightPrimary) = if (tagPreset == TagPalettePreset.DYNAMIC_AUTO) {
+        val colorResult = TagColor.getColorScheme(normalizedName, isDark)
+        Triple(
+            Color(colorResult.backgroundArgb),
+            Color(colorResult.textArgb),
+            Color(colorResult.backgroundArgb)
+        )
+    } else {
+        Triple(
+            tagPreset.backgroundColor,
+            tagPreset.textColor,
+            tagPreset.primaryColor
+        )
+    }
+
     val baseBorderColor = textColor.copy(alpha = if (isDark) 0.35f else 0.40f)
 
-    // Directional specular glow border: high luster on top-left, fading gently
-    val specularGlowBorder = Brush.linearGradient(
-        colors = listOf(
-            Color.White.copy(alpha = if (isDark) 0.55f else 0.75f),
-            baseBorderColor,
-            baseBorderColor.copy(alpha = 0.15f)
+    // Optional animation transition
+    val infiniteTransition = rememberInfiniteTransition(label = "tagBadgeAnim")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.30f,
+        targetValue = 0.90f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        start = Offset(0f, 0f),
-        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+        label = "pulseAlpha"
     )
 
-    // Subtle luster surface gradient
+    val shimmerX by infiniteTransition.animateFloat(
+        initialValue = -60f,
+        targetValue = 180f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerX"
+    )
+
+    val floatOffsetDp by infiniteTransition.animateFloat(
+        initialValue = -1.2f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "floatOffset"
+    )
+
+    // Directional specular glow border
+    val specularGlowBorder = when (tagAnimation) {
+        TagAnimation.PULSE_GLOW -> Brush.linearGradient(
+            colors = listOf(
+                highlightPrimary.copy(alpha = pulseAlpha),
+                baseBorderColor.copy(alpha = pulseAlpha * 0.7f),
+                baseBorderColor.copy(alpha = 0.15f)
+            ),
+            start = Offset(0f, 0f),
+            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+        )
+        TagAnimation.SHIMMER_SWEEP -> Brush.linearGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.70f),
+                highlightPrimary.copy(alpha = 0.50f),
+                baseBorderColor.copy(alpha = 0.20f)
+            ),
+            start = Offset(shimmerX, 0f),
+            end = Offset(shimmerX + 50f, 50f)
+        )
+        else -> Brush.linearGradient(
+            colors = listOf(
+                Color.White.copy(alpha = if (isDark) 0.55f else 0.75f),
+                baseBorderColor,
+                baseBorderColor.copy(alpha = 0.15f)
+            ),
+            start = Offset(0f, 0f),
+            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+        )
+    }
+
+    // Surface gradient
     val surfaceGradient = Brush.verticalGradient(
         colors = listOf(
             baseBgColor.copy(alpha = if (isDark) 0.92f else 0.98f),
@@ -73,20 +157,27 @@ fun TagBadge(
         )
     )
 
+    val composedShape: Shape = tagShape.toComposeShape()
+
+    val animModifier = if (tagAnimation == TagAnimation.FLOAT_DRIFT) {
+        modifier.offset { IntOffset(0, floatOffsetDp.roundToInt()) }
+    } else {
+        modifier
+    }
+
     when (displaySize) {
         TagDisplaySize.COLOR_DOT -> {
-            val shape = RoundedCornerShape(5.dp)
             Box(
-                modifier = modifier
+                modifier = animModifier
                     .shadow(
                         elevation = 1.5.dp,
-                        shape = shape,
+                        shape = composedShape,
                         spotColor = Color.Black.copy(alpha = 0.25f),
                         ambientColor = Color.Black.copy(alpha = 0.12f)
                     )
-                    .clip(shape)
+                    .clip(composedShape)
                     .background(Color.Black.copy(alpha = 0.72f))
-                    .border(width = 0.5.dp, brush = specularGlowBorder, shape = shape)
+                    .border(width = 0.5.dp, brush = specularGlowBorder, shape = composedShape)
                     .padding(horizontal = 4.5.dp, vertical = 2.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -98,7 +189,7 @@ fun TagBadge(
                         modifier = Modifier
                             .size(5.5.dp)
                             .clip(CircleShape)
-                            .background(Color(colorResult.backgroundArgb))
+                            .background(highlightPrimary)
                             .border(0.5.dp, Color.White.copy(alpha = 0.45f), CircleShape)
                     )
                     Text(
@@ -114,18 +205,17 @@ fun TagBadge(
             }
         }
         TagDisplaySize.STANDARD -> {
-            val shape = RoundedCornerShape(7.dp)
             Box(
-                modifier = modifier
+                modifier = animModifier
                     .shadow(
                         elevation = 2.dp,
-                        shape = shape,
+                        shape = composedShape,
                         spotColor = Color.Black.copy(alpha = 0.22f),
                         ambientColor = Color.Black.copy(alpha = 0.10f)
                     )
-                    .clip(shape)
+                    .clip(composedShape)
                     .background(surfaceGradient)
-                    .border(width = 0.5.dp, brush = specularGlowBorder, shape = shape)
+                    .border(width = 0.5.dp, brush = specularGlowBorder, shape = composedShape)
                     .padding(horizontal = 6.5.dp, vertical = 2.5.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -152,18 +242,17 @@ fun TagBadge(
             }
         }
         TagDisplaySize.THIN_MICRO -> {
-            val shape = RoundedCornerShape(5.dp)
             Box(
-                modifier = modifier
+                modifier = animModifier
                     .shadow(
                         elevation = 1.dp,
-                        shape = shape,
+                        shape = composedShape,
                         spotColor = Color.Black.copy(alpha = 0.20f),
                         ambientColor = Color.Black.copy(alpha = 0.08f)
                     )
-                    .clip(shape)
+                    .clip(composedShape)
                     .background(surfaceGradient)
-                    .border(width = 0.5.dp, brush = specularGlowBorder, shape = shape)
+                    .border(width = 0.5.dp, brush = specularGlowBorder, shape = composedShape)
                     .padding(horizontal = 4.5.dp, vertical = 1.5.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -195,7 +284,7 @@ fun TagBadge(
 /**
  * Interactive jewelry-grade micro-pill tag chip.
  * Includes interactive state, 0.5dp specular glow border, tactile bouncy clicks,
- * and high-precision Apple SF-style typography.
+ * customizable shapes, and high-precision Apple SF-style typography.
  */
 @Composable
 fun TagChip(
@@ -205,13 +294,19 @@ fun TagChip(
     modifier: Modifier = Modifier,
     normalizedName: String = name.lowercase().trim(),
     count: Int? = null,
-    hapticsEnabled: Boolean = true
+    hapticsEnabled: Boolean = true,
+    tagShape: TagShape = TagShape.PILL,
+    tagPreset: TagPalettePreset = TagPalettePreset.DYNAMIC_AUTO
 ) {
     val isDark = isSystemInDarkTheme()
-    val colorResult = TagColor.getColorScheme(normalizedName, isDark)
-    val tagColor = Color(colorResult.backgroundArgb)
-    val tagTextColor = Color(colorResult.textArgb)
-    val pillShape = RoundedCornerShape(16.dp)
+    val (tagColor, tagTextColor) = if (tagPreset == TagPalettePreset.DYNAMIC_AUTO) {
+        val colorResult = TagColor.getColorScheme(normalizedName, isDark)
+        Pair(Color(colorResult.backgroundArgb), Color(colorResult.textArgb))
+    } else {
+        Pair(tagPreset.primaryColor, tagPreset.textColor)
+    }
+
+    val chipShape = tagShape.toComposeShape()
 
     val activeBorder = Brush.linearGradient(
         colors = listOf(
@@ -248,16 +343,16 @@ fun TagChip(
         modifier = modifier
             .shadow(
                 elevation = if (isSelected) 3.dp else 1.dp,
-                shape = pillShape,
+                shape = chipShape,
                 spotColor = if (isSelected) tagColor.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.15f),
                 ambientColor = if (isSelected) tagColor.copy(alpha = 0.20f) else Color.Transparent
             )
-            .clip(pillShape)
+            .clip(chipShape)
             .background(backgroundBrush)
             .border(
                 width = 0.5.dp,
                 brush = if (isSelected) activeBorder else inactiveBorder,
-                shape = pillShape
+                shape = chipShape
             )
             .bouncyClickable(
                 scaleDownFactor = 0.94f,

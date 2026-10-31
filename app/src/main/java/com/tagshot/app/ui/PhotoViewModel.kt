@@ -1,5 +1,6 @@
 package com.tagshot.app.ui
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -10,6 +11,8 @@ import com.tagshot.app.data.PhotoRepository
 import com.tagshot.app.data.PhotoWithTags
 import com.tagshot.app.data.SingleImportResult
 import com.tagshot.app.data.TagWithCount
+import com.tagshot.app.domain.DuplicateCluster
+import com.tagshot.app.domain.DuplicateFinder
 import com.tagshot.app.domain.FilterPhoto
 import com.tagshot.app.domain.FilterState
 import com.tagshot.app.domain.Limits
@@ -20,6 +23,14 @@ import com.tagshot.app.domain.SortOrder
 import com.tagshot.app.domain.SortablePhoto
 import com.tagshot.app.domain.TagMatchMode
 import com.tagshot.app.domain.TagParser
+import com.tagshot.app.ui.theme.ScrubberBubbleStyle
+import com.tagshot.app.ui.theme.ScrubberStyle
+import com.tagshot.app.ui.theme.ScrubberWidth
+import com.tagshot.app.ui.theme.TagAnimation
+import com.tagshot.app.ui.theme.TagPalettePreset
+import com.tagshot.app.ui.theme.TagPosition
+import com.tagshot.app.ui.theme.TagShape
+import com.tagshot.app.ui.theme.UiDesignSystem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -30,6 +41,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -118,6 +130,14 @@ class PhotoViewModel(
         private const val KEY_SHOW_LIST_FILE_SIZE = "key_show_list_file_size"
         private const val KEY_SHOW_LIST_DATE = "key_show_list_date"
         private const val KEY_SHOW_LIST_FOLDER = "key_show_list_folder"
+        private const val KEY_TAG_SHAPE = "key_tag_shape"
+        private const val KEY_TAG_POSITION = "key_tag_position"
+        private const val KEY_TAG_PALETTE_PRESET = "key_tag_palette_preset"
+        private const val KEY_TAG_ANIMATION = "key_tag_animation"
+        private const val KEY_SCRUBBER_STYLE = "key_scrubber_style"
+        private const val KEY_SCRUBBER_WIDTH = "key_scrubber_width"
+        private const val KEY_SCRUBBER_BUBBLE_STYLE = "key_scrubber_bubble_style"
+        private const val KEY_UI_DESIGN_SYSTEM = "key_ui_design_system"
     }
 
     // Persisted state via SavedStateHandle
@@ -137,6 +157,21 @@ class PhotoViewModel(
     val showListFileSizeFlow: StateFlow<Boolean> = savedStateHandle.getStateFlow(KEY_SHOW_LIST_FILE_SIZE, true)
     val showListDateFlow: StateFlow<Boolean> = savedStateHandle.getStateFlow(KEY_SHOW_LIST_DATE, true)
     val showListFolderFlow: StateFlow<Boolean> = savedStateHandle.getStateFlow(KEY_SHOW_LIST_FOLDER, true)
+    val tagShapeFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_TAG_SHAPE, TagShape.SQUIRCLE.name)
+    val tagPositionFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_TAG_POSITION, TagPosition.BOTTOM_LEFT.name)
+    val tagPalettePresetFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_TAG_PALETTE_PRESET, TagPalettePreset.DYNAMIC_AUTO.name)
+    val tagAnimationFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_TAG_ANIMATION, TagAnimation.NONE.name)
+    val scrubberStyleFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_SCRUBBER_STYLE, ScrubberStyle.CUPERTINO_CAPSULE.name)
+    val scrubberWidthFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_SCRUBBER_WIDTH, ScrubberWidth.STANDARD.name)
+    val scrubberBubbleStyleFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_SCRUBBER_BUBBLE_STYLE, ScrubberBubbleStyle.FROSTED_GLASS_LENS.name)
+    val uiDesignSystemFlow: StateFlow<String> = savedStateHandle.getStateFlow(KEY_UI_DESIGN_SYSTEM, UiDesignSystem.LIQUID_GLASS.name)
+
+    // Duplicate detection runtime state
+    private val _duplicateClustersFlow = MutableStateFlow<List<DuplicateCluster>>(emptyList())
+    val duplicateClustersFlow: StateFlow<List<DuplicateCluster>> = _duplicateClustersFlow.asStateFlow()
+
+    private val _isScanningDuplicatesFlow = MutableStateFlow(false)
+    val isScanningDuplicatesFlow: StateFlow<Boolean> = _isScanningDuplicatesFlow.asStateFlow()
 
     fun setGridColumns(cols: Int) {
         savedStateHandle[KEY_GRID_COLUMNS] = cols.coerceIn(1, 4)
@@ -172,6 +207,75 @@ class PhotoViewModel(
 
     fun setShowListFolder(show: Boolean) {
         savedStateHandle[KEY_SHOW_LIST_FOLDER] = show
+    }
+
+    fun setTagShape(shape: TagShape) {
+        savedStateHandle[KEY_TAG_SHAPE] = shape.name
+    }
+
+    fun setTagPosition(position: TagPosition) {
+        savedStateHandle[KEY_TAG_POSITION] = position.name
+    }
+
+    fun setTagPalettePreset(preset: TagPalettePreset) {
+        savedStateHandle[KEY_TAG_PALETTE_PRESET] = preset.name
+    }
+
+    fun setTagAnimation(animation: TagAnimation) {
+        savedStateHandle[KEY_TAG_ANIMATION] = animation.name
+    }
+
+    fun setScrubberStyle(style: ScrubberStyle) {
+        savedStateHandle[KEY_SCRUBBER_STYLE] = style.name
+    }
+
+    fun setScrubberWidth(width: ScrubberWidth) {
+        savedStateHandle[KEY_SCRUBBER_WIDTH] = width.name
+    }
+
+    fun setScrubberBubbleStyle(bubbleStyle: ScrubberBubbleStyle) {
+        savedStateHandle[KEY_SCRUBBER_BUBBLE_STYLE] = bubbleStyle.name
+    }
+
+    fun setUiDesignSystem(designSystem: UiDesignSystem) {
+        savedStateHandle[KEY_UI_DESIGN_SYSTEM] = designSystem.name
+    }
+
+    fun scanForDuplicates(context: Context) {
+        viewModelScope.launch(defaultDispatcher) {
+            _isScanningDuplicatesFlow.value = true
+            try {
+                val currentPhotos = (uiState.value as? MainUiState.Success)?.photos
+                    ?: repository.observePhotos().first()
+
+                val hashMap = mutableMapOf<Long, Long>()
+                for (photo in currentPhotos) {
+                    val thumbFile = File(context.filesDir, photo.photo.thumbPath)
+                    val hash = DuplicateFinder.computeDHashFromFile(thumbFile)
+                    if (hash != null) {
+                        hashMap[photo.photo.id] = hash
+                    }
+                }
+
+                val clusters = DuplicateFinder.findClusters(currentPhotos, hashMap, maxHammingDistance = 5)
+                _duplicateClustersFlow.value = clusters
+            } catch (e: Exception) {
+                _eventChannel.send(UiEvent.ShowMessage("Scan error: ${e.message}"))
+            } finally {
+                _isScanningDuplicatesFlow.value = false
+            }
+        }
+    }
+
+    fun dismissDuplicateCluster(clusterId: String) {
+        _duplicateClustersFlow.value = _duplicateClustersFlow.value.filter { it.id != clusterId }
+    }
+
+    fun deleteDuplicatesInCluster(cluster: DuplicateCluster, onComplete: () -> Unit = {}) {
+        val idsToDelete = cluster.duplicatePhotos.map { it.photo.id }
+        deletePhotos(idsToDelete)
+        dismissDuplicateCluster(cluster.id)
+        onComplete()
     }
 
     fun setTagMatchMode(mode: TagMatchMode) {

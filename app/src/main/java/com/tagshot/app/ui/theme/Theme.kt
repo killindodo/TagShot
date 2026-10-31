@@ -7,6 +7,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -243,6 +244,7 @@ fun Modifier.liquidFrostedGlass(
 fun TagShotTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     accentPalette: AccentPalette = AccentPalette.TITANIUM_SAPPHIRE,
+    uiDesignSystem: UiDesignSystem = UiDesignSystem.LIQUID_GLASS,
     dynamicColor: Boolean = false, // Keep bespoke Titanium/Obsidian theme consistent
     content: @Composable () -> Unit
 ) {
@@ -251,13 +253,36 @@ fun TagShotTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
+        uiDesignSystem == UiDesignSystem.RETRO_WIN95 -> {
+            // Classic Windows 95 battleship grey surfaces
+            if (darkTheme) {
+                buildDarkColorScheme(accentPalette).copy(
+                    surface = Color(0xFF2A2E35),
+                    surfaceVariant = Color(0xFF383E48),
+                    outline = Color(0xFF808080)
+                )
+            } else {
+                buildLightColorScheme(accentPalette).copy(
+                    surface = Color(0xFFC0C0C0),
+                    surfaceVariant = Color(0xFFD4D0C8),
+                    outline = Color(0xFF808080)
+                )
+            }
+        }
         darkTheme -> buildDarkColorScheme(accentPalette)
         else -> buildLightColorScheme(accentPalette)
     }
 
+    val customShapes = Shapes(
+        small = RoundedCornerShape(if (uiDesignSystem.isRetroBeveled) 0.dp else (uiDesignSystem.buttonRadius / 2)),
+        medium = uiDesignSystem.cardShape(),
+        large = RoundedCornerShape(if (uiDesignSystem.isRetroBeveled) 0.dp else uiDesignSystem.dialogRadius)
+    )
+
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = customShapes,
         content = content
     )
 }

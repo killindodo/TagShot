@@ -15,12 +15,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -52,6 +54,10 @@ import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
 import coil.size.Precision
 import com.tagshot.app.data.PhotoWithTags
+import com.tagshot.app.ui.theme.TagAnimation
+import com.tagshot.app.ui.theme.TagPalettePreset
+import com.tagshot.app.ui.theme.TagPosition
+import com.tagshot.app.ui.theme.TagShape
 import com.tagshot.app.ui.theme.TagShotGradients
 import java.io.File
 
@@ -69,6 +75,10 @@ fun PhotoCell(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     tagDisplaySize: TagDisplaySize = TagDisplaySize.THIN_MICRO,
+    tagShape: TagShape = TagShape.SQUIRCLE,
+    tagPosition: TagPosition = TagPosition.BOTTOM_LEFT,
+    tagPreset: TagPalettePreset = TagPalettePreset.DYNAMIC_AUTO,
+    tagAnimation: TagAnimation = TagAnimation.NONE,
     aspectRatio: Float = 1f
 ) {
     val context = LocalContext.current
@@ -190,23 +200,41 @@ fun PhotoCell(
             )
         }
 
-        // Bottom Vignette Gradient Scrim for crisp badge legibility
+        // Vignette Gradient Scrim for crisp badge legibility
         if (hasTags) {
+            val isTopPosition = tagPosition == TagPosition.TOP_LEFT || tagPosition == TagPosition.TOP_RIGHT
+            val scrimAlignment = if (isTopPosition) Alignment.TopCenter else Alignment.BottomCenter
+            val rowAlignment = when (tagPosition) {
+                TagPosition.BOTTOM_LEFT -> Alignment.BottomStart
+                TagPosition.BOTTOM_RIGHT -> Alignment.BottomEnd
+                TagPosition.TOP_LEFT -> Alignment.TopStart
+                TagPosition.TOP_RIGHT -> Alignment.TopEnd
+            }
+            val horizontalArrangement = when (tagPosition) {
+                TagPosition.BOTTOM_LEFT, TagPosition.TOP_LEFT -> Arrangement.Start
+                TagPosition.BOTTOM_RIGHT, TagPosition.TOP_RIGHT -> Arrangement.End
+            }
+
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
+                    .align(scrimAlignment)
                     .fillMaxWidth()
                     .height(48.dp)
                     .background(TagShotGradients.bottomVignetteScrim)
             )
 
-            // Micro-capsule Tag Badges (fits 2-3+ tags cleanly based on tagDisplaySize)
+            // Dynamic Tag Badges positioned at user's desired anchor
             Row(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
+                    .align(rowAlignment)
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    .padding(
+                        start = 6.dp,
+                        end = if (isInSelectionMode && tagPosition == TagPosition.TOP_RIGHT) 38.dp else 6.dp,
+                        top = if (isTopPosition) 6.dp else 0.dp,
+                        bottom = if (!isTopPosition) 6.dp else 0.dp
+                    ),
+                horizontalArrangement = horizontalArrangement,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val maxTagsToShow = when (tagDisplaySize) {
@@ -221,8 +249,12 @@ fun PhotoCell(
                     TagBadge(
                         normalizedName = tag.normalizedName,
                         displayName = tag.name,
-                        displaySize = tagDisplaySize
+                        displaySize = tagDisplaySize,
+                        tagShape = tagShape,
+                        tagPreset = tagPreset,
+                        tagAnimation = tagAnimation
                     )
+                    Spacer(modifier = Modifier.width(3.dp))
                 }
 
                 if (remainingCount > 0) {
