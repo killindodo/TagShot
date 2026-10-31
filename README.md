@@ -1,88 +1,86 @@
 # TagShot
 
-TagShot is a fast, offline, privacy-first native Android photo indexing application built with Kotlin, Jetpack Compose, and Room SQLite. It empowers users to capture or import photos, attach custom tags, and instantly filter or search them using Unicode-aware multi-token AND matching.
+[![Author](https://img.shields.io/badge/Author-killindodo-blue.svg)](https://github.com/killindodo)
+[![Platform](https://img.shields.io/badge/Platform-Android_8.0+-green.svg)](https://developer.android.com)
+[![Language](https://img.shields.io/badge/Language-Kotlin_1.9.24-purple.svg)](https://kotlinlang.org)
+[![UI](https://img.shields.io/badge/UI-Jetpack_Compose_BOM-red.svg)](https://developer.android.com/jetpack/compose)
+[![Database](https://img.shields.io/badge/Database-Room_SQLite_2.6.1-orange.svg)](https://developer.android.com/training/data-storage/room)
+[![Unit Tests](https://img.shields.io/badge/Unit_Tests-99_Passed-brightgreen.svg)]()
+
+> Developed with ❤️ by **[killindodo](https://github.com/killindodo)**.
+
+TagShot is a native, offline, privacy-first Android photo indexing and visual management application. Built from scratch with **Kotlin**, **Jetpack Compose**, and **Room SQLite**, it enables instant multi-token search, customizable tag styling, multi-system UI theming, and perceptual duplicate detection without requiring storage, camera, or internet permissions.
 
 ---
 
-## Features
+## Key Features
 
-- **Privacy-First & Permission-Free:** Zero dangerous Android permissions requested (no `CAMERA`, no storage permissions, no internet). Photos are imported using the modern Android Photo Picker (`PickMultipleVisualMedia`) and system camera contract (`TakePicture` via private `FileProvider`).
-- **Instant Search & Filter:** Unicode-aware (NFKC normalized), case-insensitive search with multi-word AND semantics. Dynamic filter chip row displaying live library counts ("All", "Untagged", and `#tag (count)`).
-- **Fast Adaptive Grid:** 110 dp adaptive thumbnail grid with up to two colored tag badges per cell (with contrast meeting WCAG 2.1 AA standards) and "+N" overflow.
-- **Detail Viewer & Focal-Invariant Zoom:** Horizontal swipe pager (`HorizontalPager`), smooth pinch-to-zoom (1× to 8×), focal-invariant panning, double-tap zoom toggle (1× ↔ 3×), and non-interfering gesture detection.
-- **Photo Metadata & Note Editor:** Bottom sheet displaying dates, image dimensions, file size, inline tag add/remove, and an editable photo note (up to 500 characters).
-- **Bulk Selection Mode:** Long-press to select multiple photos. Add tags in bulk, remove specific tags, share to other apps, or delete with confirmation.
-- **8-Second Delete Undo:** Deleting photos provides an immediate 8-second undo window via an action snackbar before files are permanently removed from disk.
-- **Tag Manager:** View all tags and usage counts; rename tags with automatic merge detection when renaming to an existing tag; delete tags everywhere without removing photo files.
-- **Deduplication:** Automatic SHA-256 byte hashing skips duplicate imports and reports skipped count.
-- **Orphan File Sweeping:** Startup cleaner checks for unreferenced disk files left by unexpected process termination.
-
----
-
-## Technical Architecture
-
-- **Language & Runtime:** Kotlin 1.9.24, OpenJDK 17.
-- **UI Toolkit:** Jetpack Compose (BOM 2024.06.00), Material 3 design, dynamic colors on Android 12+ (API 31+).
-- **Persistence:** Room 2.6.1 SQLite database with full foreign key constraints and cascade rules.
-- **Image Pipeline:** Android `BitmapFactory` downsampling with EXIF orientation correction (tags 1–8) and Coil 2.6.0 async image loader.
-- **Architecture Pattern:** MVVM with unidirectional data flow and manual dependency injection (`AppContainer`). State preserved across process death via `SavedStateHandle`.
-- **Target SDK:** Minimum SDK 26 (Android 8.0), Target SDK 34 (Android 14).
+- **Zero-Permission Privacy:** No dangerous permissions declared (no `READ_MEDIA_IMAGES`, `CAMERA`, or `INTERNET`). Media ingestion is performed safely through Android's modern Photo Picker (`PickMultipleVisualMedia`) and system camera contract (`TakePicture` via private `FileProvider`).
+- **6 Dynamic UI Design Systems:** Complete visual transformation at runtime:
+  - **Liquid Glass:** Frosted acrylic glass containers with specular borders and ambient neon glows.
+  - **Material You:** Google M3 tonal surfaces, stadium pills, and fluid dynamic curves.
+  - **Samsung One UI:** 20–26dp curvatures with ergonomic thumb-zone reachability.
+  - **HyperOS / MIUI:** Continuous super-ellipse squircles and high-contrast surfaces.
+  - **Retro Windows 95:** 0dp sharp geometry, hardware-accelerated 3D raised and sunken bevels (`Modifier.retroBevel`), battleship gray panels, and classic taskbar navigation.
+  - **Pixel Clean:** Minimalist flat surfaces with 0.5dp razor-thin borders and zero blur.
+- **Dynamic Settings Mutual Exclusion:** Intelligently adapts and locks conflicting options with visual lock badges (`🔒`), keeping theme selections consistent.
+- **Dual-Engine Duplicate Finder:**
+  - **Bitwise Exact:** SHA-256 byte hashing skips duplicate file imports automatically.
+  - **Perceptual Similarity:** Offline 64-bit difference hashing (`dHash`) identifies similar photos with Hamming distance matching, side-by-side comparison, quality scoring, and storage reclaim in the Decision Hub dialog.
+- **Unicode-Aware Instant Search:** Case-insensitive, NFKC-normalized multi-token AND search across photos, tags, and notes with sub-millisecond response.
+- **Date Range & Timeline Filters:** Filter photos by date ranges with one-tap presets ("Today", "This Month", "Last 30 Days", "This Year") or custom date pickers.
+- **Tag Style & Scrubber Customizers:** Customize tag badges (Capsule, Squircle, Sharp, Cyber, Leaf, Dot), anchor positions, color presets, and fast-scroll scrubber styles (Cupertino, Minimal, Pill, Retro Windows).
+- **8-Second Delete Undo:** Deleting photos triggers an 8-second safety window via a snackbar before files are permanently purged from private storage.
+- **Tag Manager:** Comprehensive tag management with rename, automatic merge detection, and global deletion.
+- **Creator Easter Egg:** Hidden 7-tap trigger in Settings unlocking the Guest of Honor celebration and connecting directly to GitHub.
 
 ---
 
-## Termux Build Instructions
+## Technical Stack
 
-TagShot is designed and verified to build directly inside Termux on an ARM64 Android device.
+- **Language:** Kotlin 1.9.24
+- **UI Framework:** Jetpack Compose (BOM 2024.06.00), Material 3
+- **Database:** Room 2.6.1 SQLite with foreign key cascades and relational queries
+- **Image Pipeline:** BitmapFactory downsampling with EXIF orientation correction and Coil 2.6.0 async loader
+- **Testing:** 99 JVM unit tests covering domain math, ViewModels, filters, sorters, and duplicate algorithms
+- **Target OS:** Android 8.0 (API 26) through Android 14 (API 34)
 
-### 1. Prerequisites
+---
+
+## Build Instructions (Termux / Linux / Android)
+
+TagShot is designed to compile cleanly inside Termux directly on ARM64 Android devices as well as on standard Linux/macOS/Windows workstations.
+
+### Prerequisites (Termux)
 ```bash
 pkg update && pkg upgrade -y
 pkg install -y openjdk-17 git curl unzip aapt2 android-tools
 ```
 
-### 2. Gradle AAPT2 Override
-Because Android SDK's bundled `aapt2` is an x86_64 ELF binary that cannot execute directly on ARM64 Termux Bionic libc, configure Gradle to use Termux's native `aapt2` binary in `~/.gradle/gradle.properties`:
-```properties
-android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
-org.gradle.jvmargs=-Xmx1536m -XX:+UseSerialGC -Dfile.encoding=UTF-8
-org.gradle.workers.max=2
-org.gradle.parallel=false
-org.gradle.caching=true
-kotlin.compiler.execution.strategy=in-process
-```
-
-### 3. Build & Test Commands
+### Build Commands
 ```bash
-# Compile and package debug APK:
-./gradlew assembleDebug
+# Compile and build the debug APK:
+./gradlew assembleDebug -Dorg.gradle.parallel=false
 
-# Run all 40 JVM domain and ViewModel unit tests:
-./gradlew testDebugUnitTest
-
-# Run all 12 on-device connected instrumentation tests (via ADB Wireless Debugging):
-./gradlew connectedDebugAndroidTest
+# Run all 99 JVM unit tests:
+./gradlew testDebugUnitTest -Dorg.gradle.parallel=false
 
 # Run Android Lint:
-./gradlew lintDebug
+./gradlew lintDebug -Dorg.gradle.parallel=false
 ```
 
----
-
-## Installing on Device
-
-You can install the debug APK directly via ADB:
+### Installation
+Install directly to your device via ADB:
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
-Or copy it to your device's Downloads directory (requires `termux-setup-storage`):
+Or copy to Downloads for direct package installer launch:
 ```bash
 cp app/build/outputs/apk/debug/app-debug.apk ~/storage/downloads/tagshot-debug.apk
 ```
-Then tap the APK inside your device's Files app to install.
 
 ---
 
-## Limitations
+## License & Attribution
 
-- **No Cloud Backup:** TagShot stores photos and database records strictly in private internal app storage (`context.filesDir`). Uninstalling the application deletes all saved photos, notes, and tags permanently.
-- **Single-Threaded Gradle on Phone:** Due to device RAM and thermal boundaries, Gradle builds should be run sequentially (avoid parallel tasks).
+Designed and created by **[killindodo](https://github.com/killindodo)**. Open-source under the MIT License.
