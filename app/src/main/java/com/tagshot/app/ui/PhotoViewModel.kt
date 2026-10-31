@@ -201,6 +201,9 @@ class PhotoViewModel(
 
     fun setTagDisplaySize(size: TagDisplaySize) {
         savedStateHandle[KEY_TAG_DISPLAY_SIZE] = size.name
+        if (size == TagDisplaySize.COLOR_DOT) {
+            savedStateHandle[KEY_TAG_ANIMATION] = TagAnimation.NONE.name
+        }
     }
 
     fun setShowListFileSize(show: Boolean) {
@@ -245,6 +248,87 @@ class PhotoViewModel(
 
     fun setUiDesignSystem(designSystem: UiDesignSystem) {
         savedStateHandle[KEY_UI_DESIGN_SYSTEM] = designSystem.name
+
+        // Dynamically auto-adapt dependent styling tokens for full cross-system coherence
+        when (designSystem) {
+            UiDesignSystem.RETRO_WIN95 -> {
+                savedStateHandle[KEY_TAG_SHAPE] = TagShape.SHARP_RECT.name
+                savedStateHandle[KEY_TAG_ANIMATION] = TagAnimation.NONE.name
+                savedStateHandle[KEY_SCRUBBER_STYLE] = ScrubberStyle.RETRO_WINDOWS.name
+                savedStateHandle[KEY_SCRUBBER_BUBBLE_STYLE] = ScrubberBubbleStyle.WINDOWS_95_TOOLTIP.name
+            }
+            UiDesignSystem.LIQUID_GLASS -> {
+                val currentScrubber = savedStateHandle.get<String>(KEY_SCRUBBER_STYLE)
+                if (currentScrubber == ScrubberStyle.RETRO_WINDOWS.name) {
+                    savedStateHandle[KEY_SCRUBBER_STYLE] = ScrubberStyle.CUPERTINO_CAPSULE.name
+                }
+                val currentBubble = savedStateHandle.get<String>(KEY_SCRUBBER_BUBBLE_STYLE)
+                if (currentBubble == ScrubberBubbleStyle.WINDOWS_95_TOOLTIP.name) {
+                    savedStateHandle[KEY_SCRUBBER_BUBBLE_STYLE] = ScrubberBubbleStyle.FROSTED_GLASS_LENS.name
+                }
+                val currentTagShape = savedStateHandle.get<String>(KEY_TAG_SHAPE)
+                if (currentTagShape == TagShape.SHARP_RECT.name) {
+                    savedStateHandle[KEY_TAG_SHAPE] = TagShape.SQUIRCLE.name
+                }
+            }
+            UiDesignSystem.MATERIAL_YOU -> {
+                val currentScrubber = savedStateHandle.get<String>(KEY_SCRUBBER_STYLE)
+                if (currentScrubber == ScrubberStyle.RETRO_WINDOWS.name) {
+                    savedStateHandle[KEY_SCRUBBER_STYLE] = ScrubberStyle.CUPERTINO_CAPSULE.name
+                }
+                val currentBubble = savedStateHandle.get<String>(KEY_SCRUBBER_BUBBLE_STYLE)
+                if (currentBubble == ScrubberBubbleStyle.WINDOWS_95_TOOLTIP.name) {
+                    savedStateHandle[KEY_SCRUBBER_BUBBLE_STYLE] = ScrubberBubbleStyle.MATERIAL_PILL.name
+                }
+                val currentTagShape = savedStateHandle.get<String>(KEY_TAG_SHAPE)
+                if (currentTagShape == TagShape.SHARP_RECT.name) {
+                    savedStateHandle[KEY_TAG_SHAPE] = TagShape.PILL.name
+                }
+            }
+            UiDesignSystem.PIXEL_CLEAN -> {
+                savedStateHandle[KEY_TAG_ANIMATION] = TagAnimation.NONE.name
+                val currentScrubber = savedStateHandle.get<String>(KEY_SCRUBBER_STYLE)
+                if (currentScrubber == ScrubberStyle.RETRO_WINDOWS.name) {
+                    savedStateHandle[KEY_SCRUBBER_STYLE] = ScrubberStyle.MINIMAL_NOTCH.name
+                }
+                val currentBubble = savedStateHandle.get<String>(KEY_SCRUBBER_BUBBLE_STYLE)
+                if (currentBubble == ScrubberBubbleStyle.WINDOWS_95_TOOLTIP.name) {
+                    savedStateHandle[KEY_SCRUBBER_BUBBLE_STYLE] = ScrubberBubbleStyle.MATERIAL_PILL.name
+                }
+                val currentTagShape = savedStateHandle.get<String>(KEY_TAG_SHAPE)
+                if (currentTagShape == TagShape.SHARP_RECT.name) {
+                    savedStateHandle[KEY_TAG_SHAPE] = TagShape.SQUIRCLE.name
+                }
+            }
+            UiDesignSystem.HYPER_OS -> {
+                val currentScrubber = savedStateHandle.get<String>(KEY_SCRUBBER_STYLE)
+                if (currentScrubber == ScrubberStyle.RETRO_WINDOWS.name) {
+                    savedStateHandle[KEY_SCRUBBER_STYLE] = ScrubberStyle.CUPERTINO_CAPSULE.name
+                }
+                val currentBubble = savedStateHandle.get<String>(KEY_SCRUBBER_BUBBLE_STYLE)
+                if (currentBubble == ScrubberBubbleStyle.WINDOWS_95_TOOLTIP.name) {
+                    savedStateHandle[KEY_SCRUBBER_BUBBLE_STYLE] = ScrubberBubbleStyle.FROSTED_GLASS_LENS.name
+                }
+                val currentTagShape = savedStateHandle.get<String>(KEY_TAG_SHAPE)
+                if (currentTagShape == TagShape.SHARP_RECT.name) {
+                    savedStateHandle[KEY_TAG_SHAPE] = TagShape.SQUIRCLE.name
+                }
+            }
+            UiDesignSystem.ONE_UI -> {
+                val currentScrubber = savedStateHandle.get<String>(KEY_SCRUBBER_STYLE)
+                if (currentScrubber == ScrubberStyle.RETRO_WINDOWS.name) {
+                    savedStateHandle[KEY_SCRUBBER_STYLE] = ScrubberStyle.CUPERTINO_CAPSULE.name
+                }
+                val currentBubble = savedStateHandle.get<String>(KEY_SCRUBBER_BUBBLE_STYLE)
+                if (currentBubble == ScrubberBubbleStyle.WINDOWS_95_TOOLTIP.name) {
+                    savedStateHandle[KEY_SCRUBBER_BUBBLE_STYLE] = ScrubberBubbleStyle.MATERIAL_PILL.name
+                }
+                val currentTagShape = savedStateHandle.get<String>(KEY_TAG_SHAPE)
+                if (currentTagShape == TagShape.SHARP_RECT.name) {
+                    savedStateHandle[KEY_TAG_SHAPE] = TagShape.PILL.name
+                }
+            }
+        }
     }
 
     fun setDateRange(startDate: Long?, endDate: Long?) {

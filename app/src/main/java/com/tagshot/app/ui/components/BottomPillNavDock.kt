@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
@@ -40,7 +41,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tagshot.app.ui.MainTab
+import com.tagshot.app.ui.theme.LocalUiDesignSystem
 import com.tagshot.app.ui.theme.TagShotGradients
+import com.tagshot.app.ui.theme.UiDesignSystem
+import com.tagshot.app.ui.theme.retroBevel
 
 data class NavItem(
     val tab: MainTab,
@@ -67,8 +71,10 @@ fun BottomPillNavDock(
     modifier: Modifier = Modifier,
     hapticsEnabled: Boolean = true
 ) {
-    val capsuleShape = RoundedCornerShape(20.dp)
-    val itemShape = RoundedCornerShape(15.dp)
+    val designSystem = LocalUiDesignSystem.current
+    val isDark = isSystemInDarkTheme()
+    val capsuleShape = designSystem.navDockShape
+    val itemShape = if (designSystem.isRetroBeveled) RoundedCornerShape(0.dp) else RoundedCornerShape((designSystem.navDockRadius - 5.dp).coerceAtLeast(4.dp))
     val primaryColor = MaterialTheme.colorScheme.primary
     val neonUnderglowColor = primaryColor.copy(alpha = 0.22f)
 
@@ -78,32 +84,42 @@ fun BottomPillNavDock(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        // Ambient neon underglow layer matching primary accent
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .padding(horizontal = 6.dp, vertical = 1.dp)
-                .shadow(
-                    elevation = 14.dp,
-                    shape = capsuleShape,
-                    spotColor = primaryColor.copy(alpha = 0.60f),
-                    ambientColor = neonUnderglowColor
-                )
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            neonUnderglowColor,
-                            primaryColor.copy(alpha = 0.06f),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = capsuleShape
-                )
-        )
+        // Ambient neon underglow layer matching primary accent (disabled for clean and retro styles)
+        if (designSystem == UiDesignSystem.LIQUID_GLASS || designSystem == UiDesignSystem.HYPER_OS) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .padding(horizontal = 6.dp, vertical = 1.dp)
+                    .shadow(
+                        elevation = 14.dp,
+                        shape = capsuleShape,
+                        spotColor = primaryColor.copy(alpha = 0.60f),
+                        ambientColor = neonUnderglowColor
+                    )
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                neonUnderglowColor,
+                                primaryColor.copy(alpha = 0.06f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = capsuleShape
+                    )
+            )
+        }
 
-        // Frosted glass capsule dock frame
-        Box(
-            modifier = Modifier
+        // Dock frame with dynamic design system treatment
+        val dockFrameModifier = when (designSystem) {
+            UiDesignSystem.RETRO_WIN95 -> Modifier
+                .retroBevel(
+                    isSunken = false,
+                    strokeWidth = 2.dp,
+                    highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                    shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                    fillColor = if (isDark) Color(0xFF2B2E35) else Color(0xFFC0C0C0)
+                )
+            UiDesignSystem.LIQUID_GLASS -> Modifier
                 .shadow(
                     elevation = 12.dp,
                     shape = capsuleShape,
@@ -118,6 +134,31 @@ fun BottomPillNavDock(
                     highlightColor = Color.White.copy(alpha = 0.20f),
                     shadowColor = primaryColor.copy(alpha = 0.15f)
                 )
+            UiDesignSystem.HYPER_OS -> Modifier
+                .shadow(elevation = 10.dp, shape = capsuleShape)
+                .clip(capsuleShape)
+                .background(if (isDark) Color(0xFF161B23).copy(alpha = 0.95f) else Color(0xFFF3F4F6).copy(alpha = 0.98f))
+                .border(1.dp, if (isDark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.12f), capsuleShape)
+            UiDesignSystem.ONE_UI -> Modifier
+                .shadow(elevation = 8.dp, shape = capsuleShape)
+                .clip(capsuleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f))
+                .border(0.75.dp, Color.White.copy(alpha = 0.12f), capsuleShape)
+            UiDesignSystem.MATERIAL_YOU -> Modifier
+                .shadow(elevation = 6.dp, shape = capsuleShape)
+                .clip(capsuleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), capsuleShape)
+            UiDesignSystem.PIXEL_CLEAN -> Modifier
+                .shadow(elevation = 3.dp, shape = capsuleShape)
+                .clip(capsuleShape)
+                .background(if (isDark) Color(0xFF1B1F24) else Color(0xFFF8F9FA))
+                .border(0.5.dp, if (isDark) Color.White.copy(alpha = 0.16f) else Color.Black.copy(alpha = 0.12f), capsuleShape)
+        }
+
+        Box(
+            modifier = Modifier
+                .then(dockFrameModifier)
                 .padding(horizontal = 4.dp, vertical = 3.dp)
         ) {
             val totalInnerWidth = 250.dp
@@ -138,32 +179,49 @@ fun BottomPillNavDock(
                 modifier = Modifier.width(totalInnerWidth),
                 contentAlignment = Alignment.CenterStart
             ) {
-                // Animated sliding pill indicator with luminous specular gradient
-                Box(
-                    modifier = Modifier
-                        .offset(x = animatedIndicatorOffset)
-                        .width(indicatorWidth)
-                        .height(34.dp)
-                        .clip(itemShape)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    primaryColor.copy(alpha = 0.24f),
-                                    primaryColor.copy(alpha = 0.10f)
+                // Indicator styling matching design system
+                if (designSystem == UiDesignSystem.RETRO_WIN95) {
+                    // Win95 sunken pressed button effect for active tab
+                    Box(
+                        modifier = Modifier
+                            .offset(x = animatedIndicatorOffset)
+                            .width(indicatorWidth)
+                            .height(34.dp)
+                            .retroBevel(
+                                isSunken = true,
+                                strokeWidth = 2.dp,
+                                highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                fillColor = if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)
+                            )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .offset(x = animatedIndicatorOffset)
+                            .width(indicatorWidth)
+                            .height(34.dp)
+                            .clip(itemShape)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        primaryColor.copy(alpha = 0.24f),
+                                        primaryColor.copy(alpha = 0.10f)
+                                    )
                                 )
                             )
-                        )
-                        .border(
-                            width = 1.dp,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    primaryColor.copy(alpha = 0.55f),
-                                    primaryColor.copy(alpha = 0.18f)
-                                )
-                            ),
-                            shape = itemShape
-                        )
-                )
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        primaryColor.copy(alpha = 0.55f),
+                                        primaryColor.copy(alpha = 0.18f)
+                                    )
+                                ),
+                                shape = itemShape
+                            )
+                    )
+                }
 
                 // Tab buttons row
                 Row(

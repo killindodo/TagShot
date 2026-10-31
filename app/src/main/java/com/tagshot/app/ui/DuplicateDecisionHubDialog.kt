@@ -17,8 +17,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.tagshot.app.ui.theme.LocalUiDesignSystem
+import com.tagshot.app.ui.theme.UiDesignSystem
+import com.tagshot.app.ui.theme.retroBevel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
@@ -88,21 +92,40 @@ fun DuplicateDecisionHubDialog(
         }
     }
 
+    val designSystem = LocalUiDesignSystem.current
+    val isDark = isSystemInDarkTheme()
+    val dialogShape = designSystem.dialogShape
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(
-            modifier = Modifier
+        val dialogModifier = if (designSystem == UiDesignSystem.RETRO_WIN95) {
+            Modifier
                 .fillMaxWidth(0.96f)
                 .fillMaxHeight(0.92f)
-                .clip(RoundedCornerShape(24.dp))
+                .retroBevel(
+                    isSunken = false,
+                    strokeWidth = 2.dp,
+                    highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                    shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                    fillColor = if (isDark) Color(0xFF2C3038) else Color(0xFFC0C0C0)
+                )
+        } else {
+            Modifier
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.92f)
+                .clip(dialogShape)
                 .border(
                     width = 1.dp,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                    shape = RoundedCornerShape(24.dp)
-                ),
-            color = MaterialTheme.colorScheme.surface,
+                    shape = dialogShape
+                )
+        }
+
+        Surface(
+            modifier = dialogModifier,
+            color = if (designSystem == UiDesignSystem.RETRO_WIN95) Color.Transparent else MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp
         ) {
             Column(

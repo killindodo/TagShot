@@ -54,11 +54,14 @@ import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
 import coil.size.Precision
 import com.tagshot.app.data.PhotoWithTags
+import com.tagshot.app.ui.theme.LocalUiDesignSystem
 import com.tagshot.app.ui.theme.TagAnimation
 import com.tagshot.app.ui.theme.TagPalettePreset
 import com.tagshot.app.ui.theme.TagPosition
 import com.tagshot.app.ui.theme.TagShape
 import com.tagshot.app.ui.theme.TagShotGradients
+import com.tagshot.app.ui.theme.UiDesignSystem
+import com.tagshot.app.ui.theme.retroBevel
 import java.io.File
 
 /**
@@ -111,28 +114,44 @@ fun PhotoCell(
         label = "cellSelectScale"
     )
 
-    val borderColor by animateColorAsState(
+    val activeBorderColor by animateColorAsState(
         targetValue = when {
             isSelected -> MaterialTheme.colorScheme.primary
-            isInSelectionMode -> Color.White.copy(alpha = 0.12f)
-            else -> Color.Transparent
+            isInSelectionMode -> Color.White.copy(alpha = 0.18f)
+            else -> Color.White.copy(alpha = 0.06f)
         },
         animationSpec = tween(durationMillis = 200),
         label = "cellBorderColor"
     )
 
-    val cellShape = RoundedCornerShape(12.dp)
+    val designSystem = LocalUiDesignSystem.current
+    val cellShape = designSystem.photoCellShape
     val baseModifier = if (aspectRatio > 0f) modifier.aspectRatio(aspectRatio) else modifier
+
+    val cellBorderModifier = if (designSystem == UiDesignSystem.RETRO_WIN95) {
+        if (isSelected) {
+            Modifier.border(width = 3.dp, color = MaterialTheme.colorScheme.primary, shape = cellShape)
+        } else {
+            Modifier.retroBevel(
+                isSunken = true,
+                strokeWidth = 2.dp,
+                highlightColor = Color(0xFF6B7280),
+                shadowColor = Color(0xFF1B1E24)
+            )
+        }
+    } else {
+        Modifier.border(
+            width = if (isSelected) 2.5.dp else if (isInSelectionMode) 1.dp else 0.5.dp,
+            color = activeBorderColor,
+            shape = cellShape
+        )
+    }
 
     Box(
         modifier = baseModifier
             .scale(cellScale)
             .clip(cellShape)
-            .border(
-                width = if (isSelected) 2.5.dp else if (isInSelectionMode) 1.dp else 0.dp,
-                color = borderColor,
-                shape = cellShape
-            )
+            .then(cellBorderModifier)
             .semantics { contentDescription = cellDescription }
             .bouncyClickable(
                 onClick = onClick,

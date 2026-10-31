@@ -13,6 +13,8 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -240,6 +242,11 @@ fun Modifier.liquidFrostedGlass(
         shadowColor = shadowColor
     )
 
+/**
+ * CompositionLocal key providing the currently active UiDesignSystem to the entire compose hierarchy.
+ */
+val LocalUiDesignSystem = staticCompositionLocalOf { UiDesignSystem.LIQUID_GLASS }
+
 @Composable
 fun TagShotTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -254,18 +261,22 @@ fun TagShotTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         uiDesignSystem == UiDesignSystem.RETRO_WIN95 -> {
-            // Classic Windows 95 battleship grey surfaces
+            // Classic Windows 95 battleship grey surfaces & vintage titlebar navy
             if (darkTheme) {
                 buildDarkColorScheme(accentPalette).copy(
+                    background = Color(0xFF1E2127),
                     surface = Color(0xFF2A2E35),
                     surfaceVariant = Color(0xFF383E48),
-                    outline = Color(0xFF808080)
+                    outline = Color(0xFF808080),
+                    outlineVariant = Color(0xFF505560)
                 )
             } else {
                 buildLightColorScheme(accentPalette).copy(
+                    background = Color(0xFFB0B0B0),
                     surface = Color(0xFFC0C0C0),
                     surfaceVariant = Color(0xFFD4D0C8),
-                    outline = Color(0xFF808080)
+                    outline = Color(0xFF808080),
+                    outlineVariant = Color(0xFFA0A0A0)
                 )
             }
         }
@@ -275,14 +286,18 @@ fun TagShotTheme(
 
     val customShapes = Shapes(
         small = RoundedCornerShape(if (uiDesignSystem.isRetroBeveled) 0.dp else (uiDesignSystem.buttonRadius / 2)),
-        medium = uiDesignSystem.cardShape(),
+        medium = uiDesignSystem.cardShape,
         large = RoundedCornerShape(if (uiDesignSystem.isRetroBeveled) 0.dp else uiDesignSystem.dialogRadius)
     )
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        shapes = customShapes,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalUiDesignSystem provides uiDesignSystem
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            shapes = customShapes,
+            content = content
+        )
+    }
 }

@@ -57,6 +57,14 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import com.tagshot.app.domain.DuplicateCluster
 import com.tagshot.app.ui.components.TagBadge
 import com.tagshot.app.ui.components.TagDisplaySize
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import com.tagshot.app.ui.theme.LocalUiDesignSystem
+import com.tagshot.app.ui.theme.cardContainerColor
+import com.tagshot.app.ui.theme.designCardBorder
+import com.tagshot.app.ui.theme.retroBevel
 import com.tagshot.app.ui.theme.ScrubberBubbleStyle
 import com.tagshot.app.ui.theme.ScrubberStyle
 import com.tagshot.app.ui.theme.ScrubberWidth
@@ -87,6 +95,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
@@ -231,90 +240,7 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 1. Viewing Style Section ---
-        SectionHeader(title = "VIEWING STYLE & LAYOUT")
-        ViewingStyleCard(
-            selectedStyle = viewingStyle,
-            onSelectStyle = { viewModel.setViewingStyle(it) },
-            hapticsEnabled = hapticsEnabled
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // --- FastScroll Slider Customizer ---
-        SectionHeader(title = "TIMELINE SCRUBBER / SLIDER")
-        ScrubberCustomizerCard(
-            selectedStyle = currentScrubberStyle,
-            selectedWidth = currentScrubberWidth,
-            selectedBubble = currentScrubberBubble,
-            onSelectStyle = { viewModel.setScrubberStyle(it) },
-            onSelectWidth = { viewModel.setScrubberWidth(it) },
-            onSelectBubble = { viewModel.setScrubberBubbleStyle(it) },
-            hapticsEnabled = hapticsEnabled
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // --- 2. Tag Badge Customization ---
-        SectionHeader(title = "TAG BADGE CUSTOMIZATION")
-        TagSizeCard(
-            selectedSize = tagDisplaySize,
-            onSelectSize = { viewModel.setTagDisplaySize(it) },
-            hapticsEnabled = hapticsEnabled
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // --- Tag Style & Shape Customizer ---
-        SectionHeader(title = "TAG SHAPE & STYLE CUSTOMIZER")
-        TagStyleCustomizerCard(
-            selectedShape = currentTagShape,
-            selectedPosition = currentTagPosition,
-            selectedPreset = currentTagPreset,
-            selectedAnimation = currentTagAnimation,
-            onSelectShape = { viewModel.setTagShape(it) },
-            onSelectPosition = { viewModel.setTagPosition(it) },
-            onSelectPreset = { viewModel.setTagPalettePreset(it) },
-            onSelectAnimation = { viewModel.setTagAnimation(it) },
-            hapticsEnabled = hapticsEnabled
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // --- 3. Windows List Details Options ---
-        SectionHeader(title = "WINDOWS LIST DETAILS OPTIONS")
-        WindowsDetailsOptionsCard(
-            showFileSize = showListFileSize,
-            showDate = showListDate,
-            showFolder = showListFolder,
-            onToggleFileSize = { viewModel.setShowListFileSize(!showListFileSize) },
-            onToggleDate = { viewModel.setShowListDate(!showListDate) },
-            onToggleFolder = { viewModel.setShowListFolder(!showListFolder) },
-            hapticsEnabled = hapticsEnabled
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // --- 4. Grid Density Section ---
-        SectionHeader(title = "GRID DENSITY")
-        GridDensityCard(
-            selectedColumns = gridColumns,
-            onSelectColumns = { viewModel.setGridColumns(it) },
-            hapticsEnabled = hapticsEnabled
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // --- 2. Tactile Haptics Section ---
-        SectionHeader(title = "INTERACTIONS & FEEDBACK")
-        HapticsCard(
-            enabled = hapticsEnabled,
-            onToggle = { viewModel.setHapticsEnabled(!hapticsEnabled) }
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // --- UI Design System Switcher ---
+        // --- 1. UI Design System Switcher ---
         SectionHeader(title = "UI DESIGN SYSTEM")
         UiDesignSystemSelectorCard(
             selectedSystem = currentUiDesignSystem,
@@ -324,7 +250,7 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // --- Accent Theme & Palettes Section ---
+        // --- 2. Accent Theme & Palettes Section ---
         SectionHeader(title = "ACCENT THEME & PALETTES")
         AccentPaletteSelectorCard(
             selectedPalette = currentPalette,
@@ -334,7 +260,94 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // --- 3. Theme Mode Section ---
+        // --- 3. Viewing Style Section ---
+        SectionHeader(title = "VIEWING STYLE & LAYOUT")
+        ViewingStyleCard(
+            selectedStyle = viewingStyle,
+            onSelectStyle = { viewModel.setViewingStyle(it) },
+            hapticsEnabled = hapticsEnabled
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- 4. FastScroll Slider Customizer ---
+        SectionHeader(title = "TIMELINE SCRUBBER / SLIDER")
+        ScrubberCustomizerCard(
+            selectedStyle = currentScrubberStyle,
+            selectedWidth = currentScrubberWidth,
+            selectedBubble = currentScrubberBubble,
+            uiDesignSystem = currentUiDesignSystem,
+            onSelectStyle = { viewModel.setScrubberStyle(it) },
+            onSelectWidth = { viewModel.setScrubberWidth(it) },
+            onSelectBubble = { viewModel.setScrubberBubbleStyle(it) },
+            hapticsEnabled = hapticsEnabled
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- 5. Tag Badge Customization ---
+        SectionHeader(title = "TAG BADGE CUSTOMIZATION")
+        TagSizeCard(
+            selectedSize = tagDisplaySize,
+            onSelectSize = { viewModel.setTagDisplaySize(it) },
+            hapticsEnabled = hapticsEnabled
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- 6. Tag Style & Shape Customizer ---
+        SectionHeader(title = "TAG SHAPE & STYLE CUSTOMIZER")
+        TagStyleCustomizerCard(
+            selectedShape = currentTagShape,
+            selectedPosition = currentTagPosition,
+            selectedPreset = currentTagPreset,
+            selectedAnimation = currentTagAnimation,
+            tagDisplaySize = tagDisplaySize,
+            uiDesignSystem = currentUiDesignSystem,
+            onSelectShape = { viewModel.setTagShape(it) },
+            onSelectPosition = { viewModel.setTagPosition(it) },
+            onSelectPreset = { viewModel.setTagPalettePreset(it) },
+            onSelectAnimation = { viewModel.setTagAnimation(it) },
+            hapticsEnabled = hapticsEnabled
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- 7. Windows List Details Options ---
+        SectionHeader(title = "WINDOWS LIST DETAILS OPTIONS")
+        WindowsDetailsOptionsCard(
+            showFileSize = showListFileSize,
+            showDate = showListDate,
+            showFolder = showListFolder,
+            viewingStyle = viewingStyle,
+            onToggleFileSize = { viewModel.setShowListFileSize(!showListFileSize) },
+            onToggleDate = { viewModel.setShowListDate(!showListDate) },
+            onToggleFolder = { viewModel.setShowListFolder(!showListFolder) },
+            hapticsEnabled = hapticsEnabled
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- 8. Grid Density Section ---
+        SectionHeader(title = "GRID DENSITY")
+        GridDensityCard(
+            selectedColumns = gridColumns,
+            onSelectColumns = { viewModel.setGridColumns(it) },
+            hapticsEnabled = hapticsEnabled
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- 9. Tactile Haptics Section ---
+        SectionHeader(title = "INTERACTIONS & FEEDBACK")
+        HapticsCard(
+            enabled = hapticsEnabled,
+            onToggle = { viewModel.setHapticsEnabled(!hapticsEnabled) }
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- 10. Theme Mode Section ---
         SectionHeader(title = "APPEARANCE")
         ThemeSelectorCard(
             selectedMode = themeMode,
@@ -440,27 +453,69 @@ private fun SectionHeader(title: String) {
 }
 
 @Composable
+private fun DisabledReasonBadge(reason: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        modifier = Modifier
+            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Lock,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(13.dp)
+        )
+        Text(
+            text = reason,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+private fun SettingsCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val designSystem = LocalUiDesignSystem.current
+    val isDark = isSystemInDarkTheme()
+    val shape = designSystem.cardShape
+    val containerColor = cardContainerColor(designSystem, isDark, MaterialTheme.colorScheme.surfaceVariant)
+
+    Card(
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        modifier = modifier
+            .fillMaxWidth()
+            .designCardBorder(designSystem, isDark),
+        content = content
+    )
+}
+
+@Composable
 private fun ViewingStyleCard(
     selectedStyle: ViewingStyle,
     onSelectStyle: (ViewingStyle) -> Unit,
     hapticsEnabled: Boolean
 ) {
     val haptic = LocalHapticFeedback.current
+    val designSystem = LocalUiDesignSystem.current
+    val isDark = isSystemInDarkTheme()
+    val itemShape = if (designSystem.isRetroBeveled) RoundedCornerShape(0.dp) else RoundedCornerShape(12.dp)
+
     val styles = listOf(
         Triple(ViewingStyle.GRID, Icons.Default.GridView, "Grid"),
         Triple(ViewingStyle.LIST_DETAILS, Icons.AutoMirrored.Filled.ViewList, "Windows List"),
         Triple(ViewingStyle.MASONRY, Icons.Default.Dashboard, "Masonry")
     )
 
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassBorder(shape = RoundedCornerShape(18.dp))
-    ) {
+    SettingsCard {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = "Default Gallery Layout",
@@ -491,17 +546,31 @@ private fun ViewingStyleCard(
                         label = "styleIconTint"
                     )
 
-                    Box(
-                        modifier = Modifier
+                    val itemModifier = if (designSystem == UiDesignSystem.RETRO_WIN95) {
+                        Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
+                            .retroBevel(
+                                isSunken = isSelected,
+                                strokeWidth = 2.dp,
+                                highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                            )
+                    } else {
+                        Modifier
+                            .weight(1f)
+                            .clip(itemShape)
                             .background(itemBg)
                             .border(
                                 width = if (isSelected) 1.5.dp else 0.5.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = itemShape
                             )
+                    }
+
+                    Box(
+                        modifier = itemModifier
                             .bouncyClickable(
                                 hapticsEnabled = hapticsEnabled,
                                 onClick = {
@@ -544,21 +613,17 @@ private fun TagSizeCard(
     hapticsEnabled: Boolean
 ) {
     val haptic = LocalHapticFeedback.current
+    val designSystem = LocalUiDesignSystem.current
+    val isDark = isSystemInDarkTheme()
+    val itemShape = if (designSystem.isRetroBeveled) RoundedCornerShape(0.dp) else RoundedCornerShape(12.dp)
+
     val sizes = listOf(
         Pair(TagDisplaySize.THIN_MICRO, "Thin / Micro"),
         Pair(TagDisplaySize.STANDARD, "Standard"),
         Pair(TagDisplaySize.COLOR_DOT, "Color Dot")
     )
 
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassBorder(shape = RoundedCornerShape(18.dp))
-    ) {
+    SettingsCard {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = "Photo Card Tag Size",
@@ -585,17 +650,31 @@ private fun TagSizeCard(
                         label = "tagSizeBg"
                     )
 
-                    Box(
-                        modifier = Modifier
+                    val itemModifier = if (designSystem == UiDesignSystem.RETRO_WIN95) {
+                        Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
+                            .retroBevel(
+                                isSunken = isSelected,
+                                strokeWidth = 2.dp,
+                                highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                            )
+                    } else {
+                        Modifier
+                            .weight(1f)
+                            .clip(itemShape)
                             .background(itemBg)
                             .border(
                                 width = if (isSelected) 1.5.dp else 0.5.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = itemShape
                             )
+                    }
+
+                    Box(
+                        modifier = itemModifier
                             .bouncyClickable(
                                 hapticsEnabled = hapticsEnabled,
                                 onClick = {
@@ -626,9 +705,9 @@ private fun TagSizeCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(if (designSystem.isRetroBeveled) RoundedCornerShape(0.dp) else RoundedCornerShape(10.dp))
                     .background(Color.Black.copy(alpha = 0.6f))
-                    .border(0.75.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                    .border(0.75.dp, Color.White.copy(alpha = 0.15f), if (designSystem.isRetroBeveled) RoundedCornerShape(0.dp) else RoundedCornerShape(10.dp))
                     .padding(10.dp)
             ) {
                 Column {
@@ -659,20 +738,15 @@ private fun WindowsDetailsOptionsCard(
     showFileSize: Boolean,
     showDate: Boolean,
     showFolder: Boolean,
+    viewingStyle: ViewingStyle,
     onToggleFileSize: () -> Unit,
     onToggleDate: () -> Unit,
     onToggleFolder: () -> Unit,
     hapticsEnabled: Boolean
 ) {
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassBorder(shape = RoundedCornerShape(18.dp))
-    ) {
+    val isListDetails = viewingStyle == ViewingStyle.LIST_DETAILS
+
+    SettingsCard {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = "Details List Row Columns",
@@ -684,44 +758,53 @@ private fun WindowsDetailsOptionsCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            if (!isListDetails) {
+                Spacer(modifier = Modifier.height(6.dp))
+                DisabledReasonBadge(reason = "Active only in Windows List layout (currently in ${viewingStyle.name.lowercase().replace('_', ' ')})")
+            }
+
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Toggle 1: File Size & Dimensions
-            SettingToggleRow(
-                title = "File Size & Dimensions",
-                description = "Shows image storage size (e.g. 2.4 MB) and resolution",
-                checked = showFileSize,
-                onCheckedChange = { onToggleFileSize() },
-                hapticsEnabled = hapticsEnabled
-            )
+            Column(
+                modifier = if (!isListDetails) Modifier.alpha(0.38f) else Modifier
+            ) {
+                // Toggle 1: File Size & Dimensions
+                SettingToggleRow(
+                    title = "File Size & Dimensions",
+                    description = "Shows image storage size (e.g. 2.4 MB) and resolution",
+                    checked = showFileSize,
+                    onCheckedChange = { if (isListDetails) onToggleFileSize() },
+                    hapticsEnabled = hapticsEnabled && isListDetails
+                )
 
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
 
-            // Toggle 2: Date & Timestamp
-            SettingToggleRow(
-                title = "Timestamp",
-                description = "Shows photo capture or import date & time",
-                checked = showDate,
-                onCheckedChange = { onToggleDate() },
-                hapticsEnabled = hapticsEnabled
-            )
+                // Toggle 2: Date & Timestamp
+                SettingToggleRow(
+                    title = "Timestamp",
+                    description = "Shows photo capture or import date & time",
+                    checked = showDate,
+                    onCheckedChange = { if (isListDetails) onToggleDate() },
+                    hapticsEnabled = hapticsEnabled && isListDetails
+                )
 
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
 
-            // Toggle 3: Folder Location
-            SettingToggleRow(
-                title = "Folder Location Pill",
-                description = "Shows the source album or directory pill next to the title",
-                checked = showFolder,
-                onCheckedChange = { onToggleFolder() },
-                hapticsEnabled = hapticsEnabled
-            )
+                // Toggle 3: Folder Location
+                SettingToggleRow(
+                    title = "Folder Location Pill",
+                    description = "Shows the source album or directory pill next to the title",
+                    checked = showFolder,
+                    onCheckedChange = { if (isListDetails) onToggleFolder() },
+                    hapticsEnabled = hapticsEnabled && isListDetails
+                )
+            }
         }
     }
 }
@@ -779,15 +862,7 @@ private fun GridDensityCard(
     onSelectColumns: (Int) -> Unit,
     hapticsEnabled: Boolean
 ) {
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassBorder(shape = RoundedCornerShape(18.dp))
-    ) {
+    SettingsCard {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = "Gallery Photo Columns",
@@ -846,6 +921,10 @@ private fun DensityOptionItem(
     hapticsEnabled: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val designSystem = LocalUiDesignSystem.current
+    val isDark = isSystemInDarkTheme()
+    val itemShape = if (designSystem.isRetroBeveled) RoundedCornerShape(0.dp) else RoundedCornerShape(12.dp)
+
     val bgAnim by animateColorAsState(
         targetValue = if (isSelected) {
             MaterialTheme.colorScheme.primaryContainer
@@ -865,12 +944,24 @@ private fun DensityOptionItem(
         label = "densityBorder"
     )
 
+    val itemModifier = if (designSystem == UiDesignSystem.RETRO_WIN95) {
+        modifier.retroBevel(
+            isSunken = isSelected,
+            strokeWidth = 2.dp,
+            highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+            shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+            fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+        )
+    } else {
+        modifier
+            .clip(itemShape)
+            .background(bgAnim)
+            .border(1.5.dp, borderAnim, itemShape)
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(bgAnim)
-            .border(1.5.dp, borderAnim, RoundedCornerShape(12.dp))
+        modifier = itemModifier
             .bouncyClickable(
                 scaleDownFactor = 0.94f,
                 hapticsEnabled = hapticsEnabled,
@@ -905,15 +996,7 @@ private fun HapticsCard(
     enabled: Boolean,
     onToggle: () -> Unit
 ) {
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassBorder(shape = RoundedCornerShape(18.dp))
-    ) {
+    SettingsCard {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -967,15 +1050,7 @@ private fun AccentPaletteSelectorCard(
     onSelectPalette: (AccentPalette) -> Unit,
     hapticsEnabled: Boolean
 ) {
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassBorder(shape = RoundedCornerShape(18.dp))
-    ) {
+    SettingsCard {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1171,15 +1246,7 @@ private fun ThemeSelectorCard(
     onSelectMode: (String) -> Unit,
     hapticsEnabled: Boolean
 ) {
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassBorder(shape = RoundedCornerShape(18.dp))
-    ) {
+    SettingsCard {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = "Theme Palette",
@@ -1295,15 +1362,7 @@ private fun StorageStatsCard(
     onManageTags: () -> Unit,
     hapticsEnabled: Boolean
 ) {
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassBorder(shape = RoundedCornerShape(18.dp))
-    ) {
+    SettingsCard {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1498,20 +1557,7 @@ private fun AttributionCard(
     var lastTapTime by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     var isEggUnlocked by remember { androidx.compose.runtime.mutableStateOf(false) }
 
-    Card(
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassBorder(
-                shape = RoundedCornerShape(22.dp),
-                strokeWidth = 1.dp,
-                highlightColor = Color.White.copy(alpha = 0.22f),
-                shadowColor = Color.White.copy(alpha = 0.04f)
-            )
-    ) {
+    SettingsCard {
         Column(
             modifier = Modifier.padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -1740,6 +1786,7 @@ private fun calculateCacheSizeFormatted(context: Context): String {
 
 /**
  * Interactive customizer card for tag geometric shapes, photo positions, color presets, and moving animations.
+ * Dynamically enforces mutual exclusion and compatibility rules with active UiDesignSystem and TagDisplaySize.
  */
 @Composable
 private fun TagStyleCustomizerCard(
@@ -1747,6 +1794,8 @@ private fun TagStyleCustomizerCard(
     selectedPosition: TagPosition,
     selectedPreset: TagPalettePreset,
     selectedAnimation: TagAnimation,
+    tagDisplaySize: TagDisplaySize,
+    uiDesignSystem: UiDesignSystem,
     onSelectShape: (TagShape) -> Unit,
     onSelectPosition: (TagPosition) -> Unit,
     onSelectPreset: (TagPalettePreset) -> Unit,
@@ -1754,18 +1803,14 @@ private fun TagStyleCustomizerCard(
     hapticsEnabled: Boolean
 ) {
     val haptic = LocalHapticFeedback.current
+    val isDark = isSystemInDarkTheme()
+    val itemShape = if (uiDesignSystem.isRetroBeveled) RoundedCornerShape(0.dp) else RoundedCornerShape(8.dp)
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                shape = RoundedCornerShape(16.dp)
-            )
-    ) {
+    val isColorDot = tagDisplaySize == TagDisplaySize.COLOR_DOT
+    val isRetroWin95 = uiDesignSystem == UiDesignSystem.RETRO_WIN95
+    val isPixelClean = uiDesignSystem == UiDesignSystem.PIXEL_CLEAN
+
+    SettingsCard {
         Column(modifier = Modifier.padding(16.dp)) {
             // Live Interactive Preview Box
             Text(
@@ -1779,7 +1824,7 @@ private fun TagStyleCustomizerCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(110.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(if (uiDesignSystem.isRetroBeveled) RoundedCornerShape(0.dp) else RoundedCornerShape(12.dp))
                     .background(
                         Brush.verticalGradient(
                             listOf(
@@ -1788,10 +1833,9 @@ private fun TagStyleCustomizerCard(
                             )
                         )
                     )
-                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), if (uiDesignSystem.isRetroBeveled) RoundedCornerShape(0.dp) else RoundedCornerShape(12.dp))
                     .padding(8.dp)
             ) {
-                // Background simulated photo vignette
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1821,7 +1865,7 @@ private fun TagStyleCustomizerCard(
                         tagShape = selectedShape,
                         tagPreset = selectedPreset,
                         tagAnimation = selectedAnimation,
-                        displaySize = TagDisplaySize.THIN_MICRO
+                        displaySize = tagDisplaySize
                     )
                     TagBadge(
                         normalizedName = "travel",
@@ -1829,7 +1873,7 @@ private fun TagStyleCustomizerCard(
                         tagShape = selectedShape,
                         tagPreset = selectedPreset,
                         tagAnimation = selectedAnimation,
-                        displaySize = TagDisplaySize.THIN_MICRO
+                        displaySize = tagDisplaySize
                     )
                     TagBadge(
                         normalizedName = "pro",
@@ -1837,7 +1881,7 @@ private fun TagStyleCustomizerCard(
                         tagShape = selectedShape,
                         tagPreset = selectedPreset,
                         tagAnimation = selectedAnimation,
-                        displaySize = TagDisplaySize.THIN_MICRO
+                        displaySize = tagDisplaySize
                     )
                 }
             }
@@ -1845,11 +1889,26 @@ private fun TagStyleCustomizerCard(
             Spacer(modifier = Modifier.height(14.dp))
 
             // 1. Geometric Shape Selector
-            Text(
-                text = "TAG GEOMETRIC SHAPE",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "TAG GEOMETRIC SHAPE",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (isColorDot) {
+                Spacer(modifier = Modifier.height(4.dp))
+                DisabledReasonBadge(reason = "Locked to circular dot in Color Dot mode")
+            } else if (isRetroWin95) {
+                Spacer(modifier = Modifier.height(4.dp))
+                DisabledReasonBadge(reason = "Retro Win95 enforces Sharp Rectangle")
+            }
+
             Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1857,21 +1916,42 @@ private fun TagStyleCustomizerCard(
             ) {
                 TagShape.entries.take(3).forEach { shape ->
                     val isSelected = selectedShape == shape
-                    Box(
-                        modifier = Modifier
+                    val isShapeDisabled = isColorDot || (isRetroWin95 && shape != TagShape.SHARP_RECT)
+                    val shapeAlpha = if (isShapeDisabled) 0.35f else 1.0f
+
+                    val shapeModifier = if (uiDesignSystem.isRetroBeveled) {
+                        Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
+                            .alpha(shapeAlpha)
+                            .retroBevel(
+                                isSunken = isSelected,
+                                strokeWidth = 2.dp,
+                                highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                            )
+                    } else {
+                        Modifier
+                            .weight(1f)
+                            .alpha(shapeAlpha)
+                            .clip(itemShape)
                             .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
                             .border(
                                 width = if (isSelected) 1.5.dp else 0.5.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = itemShape
                             )
+                    }
+
+                    Box(
+                        modifier = shapeModifier
                             .bouncyClickable(
-                                hapticsEnabled = hapticsEnabled,
+                                hapticsEnabled = hapticsEnabled && !isShapeDisabled,
                                 onClick = {
-                                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onSelectShape(shape)
+                                    if (!isShapeDisabled) {
+                                        if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSelectShape(shape)
+                                    }
                                 }
                             )
                             .padding(vertical = 8.dp),
@@ -1893,21 +1973,42 @@ private fun TagStyleCustomizerCard(
             ) {
                 TagShape.entries.drop(3).forEach { shape ->
                     val isSelected = selectedShape == shape
-                    Box(
-                        modifier = Modifier
+                    val isShapeDisabled = isColorDot || (isRetroWin95 && shape != TagShape.SHARP_RECT)
+                    val shapeAlpha = if (isShapeDisabled) 0.35f else 1.0f
+
+                    val shapeModifier = if (uiDesignSystem.isRetroBeveled) {
+                        Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
+                            .alpha(shapeAlpha)
+                            .retroBevel(
+                                isSunken = isSelected,
+                                strokeWidth = 2.dp,
+                                highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                            )
+                    } else {
+                        Modifier
+                            .weight(1f)
+                            .alpha(shapeAlpha)
+                            .clip(itemShape)
                             .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
                             .border(
                                 width = if (isSelected) 1.5.dp else 0.5.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = itemShape
                             )
+                    }
+
+                    Box(
+                        modifier = shapeModifier
                             .bouncyClickable(
-                                hapticsEnabled = hapticsEnabled,
+                                hapticsEnabled = hapticsEnabled && !isShapeDisabled,
                                 onClick = {
-                                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onSelectShape(shape)
+                                    if (!isShapeDisabled) {
+                                        if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSelectShape(shape)
+                                    }
                                 }
                             )
                             .padding(vertical = 8.dp),
@@ -1938,16 +2039,31 @@ private fun TagStyleCustomizerCard(
             ) {
                 TagPosition.entries.forEach { pos ->
                     val isSelected = selectedPosition == pos
-                    Box(
-                        modifier = Modifier
+
+                    val posModifier = if (uiDesignSystem.isRetroBeveled) {
+                        Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
+                            .retroBevel(
+                                isSunken = isSelected,
+                                strokeWidth = 2.dp,
+                                highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                            )
+                    } else {
+                        Modifier
+                            .weight(1f)
+                            .clip(itemShape)
                             .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
                             .border(
                                 width = if (isSelected) 1.5.dp else 0.5.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.secondary else Color.White.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = itemShape
                             )
+                    }
+
+                    Box(
+                        modifier = posModifier
                             .bouncyClickable(
                                 hapticsEnabled = hapticsEnabled,
                                 onClick = {
@@ -1989,10 +2105,20 @@ private fun TagStyleCustomizerCard(
                 ) {
                     TagPalettePreset.entries.take(4).forEach { preset ->
                         val isSelected = selectedPreset == preset
-                        Box(
-                            modifier = Modifier
+                        val presetModifier = if (uiDesignSystem.isRetroBeveled) {
+                            Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
+                                .retroBevel(
+                                    isSunken = isSelected,
+                                    strokeWidth = 2.dp,
+                                    highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                    shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                    fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                                )
+                        } else {
+                            Modifier
+                                .weight(1f)
+                                .clip(itemShape)
                                 .background(
                                     Brush.linearGradient(
                                         listOf(
@@ -2004,8 +2130,12 @@ private fun TagStyleCustomizerCard(
                                 .border(
                                     width = if (isSelected) 1.5.dp else 0.5.dp,
                                     color = if (isSelected) Color.White else preset.primaryColor.copy(alpha = 0.4f),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = itemShape
                                 )
+                        }
+
+                        Box(
+                            modifier = presetModifier
                                 .bouncyClickable(
                                     hapticsEnabled = hapticsEnabled,
                                     onClick = {
@@ -2031,10 +2161,20 @@ private fun TagStyleCustomizerCard(
                 ) {
                     TagPalettePreset.entries.drop(4).forEach { preset ->
                         val isSelected = selectedPreset == preset
-                        Box(
-                            modifier = Modifier
+                        val presetModifier = if (uiDesignSystem.isRetroBeveled) {
+                            Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
+                                .retroBevel(
+                                    isSunken = isSelected,
+                                    strokeWidth = 2.dp,
+                                    highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                    shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                    fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                                )
+                        } else {
+                            Modifier
+                                .weight(1f)
+                                .clip(itemShape)
                                 .background(
                                     Brush.linearGradient(
                                         listOf(
@@ -2046,8 +2186,12 @@ private fun TagStyleCustomizerCard(
                                 .border(
                                     width = if (isSelected) 1.5.dp else 0.5.dp,
                                     color = if (isSelected) Color.White else preset.primaryColor.copy(alpha = 0.4f),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = itemShape
                                 )
+                        }
+
+                        Box(
+                            modifier = presetModifier
                                 .bouncyClickable(
                                     hapticsEnabled = hapticsEnabled,
                                     onClick = {
@@ -2072,11 +2216,29 @@ private fun TagStyleCustomizerCard(
             Spacer(modifier = Modifier.height(14.dp))
 
             // 4. Moving Animations
-            Text(
-                text = "DYNAMIC MOVING ANIMATION",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "DYNAMIC MOVING ANIMATION",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (isColorDot) {
+                Spacer(modifier = Modifier.height(4.dp))
+                DisabledReasonBadge(reason = "Animations disabled for Color Dot badges")
+            } else if (isRetroWin95) {
+                Spacer(modifier = Modifier.height(4.dp))
+                DisabledReasonBadge(reason = "Static tags only in Retro Win95 mode")
+            } else if (isPixelClean) {
+                Spacer(modifier = Modifier.height(4.dp))
+                DisabledReasonBadge(reason = "Pixel Clean enforces static tags")
+            }
+
             Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -2084,21 +2246,42 @@ private fun TagStyleCustomizerCard(
             ) {
                 TagAnimation.entries.forEach { anim ->
                     val isSelected = selectedAnimation == anim
-                    Box(
-                        modifier = Modifier
+                    val isAnimDisabled = isColorDot || ((isRetroWin95 || isPixelClean) && anim != TagAnimation.NONE)
+                    val animAlpha = if (isAnimDisabled) 0.35f else 1.0f
+
+                    val animModifier = if (uiDesignSystem.isRetroBeveled) {
+                        Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
+                            .alpha(animAlpha)
+                            .retroBevel(
+                                isSunken = isSelected,
+                                strokeWidth = 2.dp,
+                                highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                            )
+                    } else {
+                        Modifier
+                            .weight(1f)
+                            .alpha(animAlpha)
+                            .clip(itemShape)
                             .background(if (isSelected) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surface)
                             .border(
                                 width = if (isSelected) 1.5.dp else 0.5.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.tertiary else Color.White.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = itemShape
                             )
+                    }
+
+                    Box(
+                        modifier = animModifier
                             .bouncyClickable(
-                                hapticsEnabled = hapticsEnabled,
+                                hapticsEnabled = hapticsEnabled && !isAnimDisabled,
                                 onClick = {
-                                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onSelectAnimation(anim)
+                                    if (!isAnimDisabled) {
+                                        if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSelectAnimation(anim)
+                                    }
                                 }
                             )
                             .padding(vertical = 8.dp),
@@ -2119,37 +2302,44 @@ private fun TagStyleCustomizerCard(
 
 /**
  * Interactive customizer card for FastScroll scrubber style, width, and date bubble.
+ * Dynamically enforces mutual exclusion with active UiDesignSystem.
  */
 @Composable
 private fun ScrubberCustomizerCard(
     selectedStyle: ScrubberStyle,
     selectedWidth: ScrubberWidth,
     selectedBubble: ScrubberBubbleStyle,
+    uiDesignSystem: UiDesignSystem,
     onSelectStyle: (ScrubberStyle) -> Unit,
     onSelectWidth: (ScrubberWidth) -> Unit,
     onSelectBubble: (ScrubberBubbleStyle) -> Unit,
     hapticsEnabled: Boolean
 ) {
     val haptic = LocalHapticFeedback.current
+    val isDark = isSystemInDarkTheme()
+    val isRetroWin95 = uiDesignSystem == UiDesignSystem.RETRO_WIN95
+    val itemShape = if (isRetroWin95) RoundedCornerShape(0.dp) else RoundedCornerShape(8.dp)
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                shape = RoundedCornerShape(16.dp)
-            )
-    ) {
+    SettingsCard {
         Column(modifier = Modifier.padding(16.dp)) {
             // 1. Slider Visual Style
-            Text(
-                text = "SLIDER TRACK STYLE",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "SLIDER TRACK STYLE",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (isRetroWin95) {
+                Spacer(modifier = Modifier.height(4.dp))
+                DisabledReasonBadge(reason = "Retro Win95 enforces Retro Windows slider")
+            }
+
             Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -2157,21 +2347,43 @@ private fun ScrubberCustomizerCard(
             ) {
                 ScrubberStyle.entries.forEach { style ->
                     val isSelected = selectedStyle == style
-                    Box(
-                        modifier = Modifier
+                    val isStyleDisabled = (isRetroWin95 && style != ScrubberStyle.RETRO_WINDOWS) ||
+                        (!isRetroWin95 && style == ScrubberStyle.RETRO_WINDOWS)
+                    val styleAlpha = if (isStyleDisabled) 0.35f else 1.0f
+
+                    val styleModifier = if (uiDesignSystem.isRetroBeveled) {
+                        Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
+                            .alpha(styleAlpha)
+                            .retroBevel(
+                                isSunken = isSelected,
+                                strokeWidth = 2.dp,
+                                highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                            )
+                    } else {
+                        Modifier
+                            .weight(1f)
+                            .alpha(styleAlpha)
+                            .clip(itemShape)
                             .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
                             .border(
                                 width = if (isSelected) 1.5.dp else 0.5.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = itemShape
                             )
+                    }
+
+                    Box(
+                        modifier = styleModifier
                             .bouncyClickable(
-                                hapticsEnabled = hapticsEnabled,
+                                hapticsEnabled = hapticsEnabled && !isStyleDisabled,
                                 onClick = {
-                                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onSelectStyle(style)
+                                    if (!isStyleDisabled) {
+                                        if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSelectStyle(style)
+                                    }
                                 }
                             )
                             .padding(vertical = 8.dp),
@@ -2202,16 +2414,31 @@ private fun ScrubberCustomizerCard(
             ) {
                 ScrubberWidth.entries.forEach { width ->
                     val isSelected = selectedWidth == width
-                    Box(
-                        modifier = Modifier
+
+                    val widthModifier = if (uiDesignSystem.isRetroBeveled) {
+                        Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
+                            .retroBevel(
+                                isSunken = isSelected,
+                                strokeWidth = 2.dp,
+                                highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                            )
+                    } else {
+                        Modifier
+                            .weight(1f)
+                            .clip(itemShape)
                             .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
                             .border(
                                 width = if (isSelected) 1.5.dp else 0.5.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.secondary else Color.White.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = itemShape
                             )
+                    }
+
+                    Box(
+                        modifier = widthModifier
                             .bouncyClickable(
                                 hapticsEnabled = hapticsEnabled,
                                 onClick = {
@@ -2235,11 +2462,23 @@ private fun ScrubberCustomizerCard(
             Spacer(modifier = Modifier.height(14.dp))
 
             // 3. Floating Date Bubble Style
-            Text(
-                text = "FLOATING DATE BUBBLE",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "FLOATING DATE BUBBLE",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (isRetroWin95) {
+                Spacer(modifier = Modifier.height(4.dp))
+                DisabledReasonBadge(reason = "Retro Win95 enforces Windows 95 Tooltip bubble")
+            }
+
             Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -2247,21 +2486,43 @@ private fun ScrubberCustomizerCard(
             ) {
                 ScrubberBubbleStyle.entries.forEach { bubble ->
                     val isSelected = selectedBubble == bubble
-                    Box(
-                        modifier = Modifier
+                    val isBubbleDisabled = (isRetroWin95 && bubble != ScrubberBubbleStyle.WINDOWS_95_TOOLTIP) ||
+                        (!isRetroWin95 && bubble == ScrubberBubbleStyle.WINDOWS_95_TOOLTIP)
+                    val bubbleAlpha = if (isBubbleDisabled) 0.35f else 1.0f
+
+                    val bubbleModifier = if (uiDesignSystem.isRetroBeveled) {
+                        Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
+                            .alpha(bubbleAlpha)
+                            .retroBevel(
+                                isSunken = isSelected,
+                                strokeWidth = 2.dp,
+                                highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                                shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                                fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                            )
+                    } else {
+                        Modifier
+                            .weight(1f)
+                            .alpha(bubbleAlpha)
+                            .clip(itemShape)
                             .background(if (isSelected) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surface)
                             .border(
                                 width = if (isSelected) 1.5.dp else 0.5.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.tertiary else Color.White.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = itemShape
                             )
+                    }
+
+                    Box(
+                        modifier = bubbleModifier
                             .bouncyClickable(
-                                hapticsEnabled = hapticsEnabled,
+                                hapticsEnabled = hapticsEnabled && !isBubbleDisabled,
                                 onClick = {
-                                    if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onSelectBubble(bubble)
+                                    if (!isBubbleDisabled) {
+                                        if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSelectBubble(bubble)
+                                    }
                                 }
                             )
                             .padding(vertical = 8.dp),
@@ -2282,6 +2543,7 @@ private fun ScrubberCustomizerCard(
 
 /**
  * Interactive selector card for the 6 foundational UI Design Systems.
+ * Displays distinctive traits, aesthetic previews, and active indicators.
  */
 @Composable
 private fun UiDesignSystemSelectorCard(
@@ -2290,35 +2552,41 @@ private fun UiDesignSystemSelectorCard(
     hapticsEnabled: Boolean
 ) {
     val haptic = LocalHapticFeedback.current
+    val isDark = isSystemInDarkTheme()
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                shape = RoundedCornerShape(16.dp)
-            )
-    ) {
+    SettingsCard {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             UiDesignSystem.entries.forEach { system ->
                 val isSelected = selectedSystem == system
+                val itemShape = system.cardShape
 
-                Box(
-                    modifier = Modifier
+                val itemModifier = if (system == UiDesignSystem.RETRO_WIN95) {
+                    Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .retroBevel(
+                            isSunken = isSelected,
+                            strokeWidth = 2.dp,
+                            highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                            shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                            fillColor = if (isSelected) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2A2E35) else Color(0xFFC0C0C0))
+                        )
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(itemShape)
                         .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
                         .border(
                             width = if (isSelected) 1.5.dp else 0.5.dp,
                             color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = itemShape
                         )
+                }
+
+                Box(
+                    modifier = itemModifier
                         .bouncyClickable(
                             hapticsEnabled = hapticsEnabled,
                             onClick = {
@@ -2326,7 +2594,7 @@ private fun UiDesignSystemSelectorCard(
                                 onSelectSystem(system)
                             }
                         )
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .padding(horizontal = 14.dp, vertical = 11.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -2334,16 +2602,49 @@ private fun UiDesignSystemSelectorCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = system.displayName,
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = system.displayName,
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (isSelected) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+                                            .padding(horizontal = 6.dp, vertical = 1.dp)
+                                    ) {
+                                        Text(
+                                            text = "ACTIVE",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = system.subtitle,
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val traitText = when (system) {
+                                UiDesignSystem.MATERIAL_YOU -> "M3 Curvature • Tonal Surfaces • Fluid Pills"
+                                UiDesignSystem.LIQUID_GLASS -> "Cupertino Frosted Acrylic • Specular Glow"
+                                UiDesignSystem.HYPER_OS -> "Super-Ellipse Squircles • Vivid Contrast"
+                                UiDesignSystem.ONE_UI -> "Ergonomic 24dp Thumb Reach • Soft Outlines"
+                                UiDesignSystem.RETRO_WIN95 -> "1995 3D Raised Bevels • 0dp Bauhaus Edges"
+                                UiDesignSystem.PIXEL_CLEAN -> "Minimalist 8dp Edges • Razor-Thin 0.5dp Border"
+                            }
+                            Text(
+                                text = traitText,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.60f)
                             )
                         }
 
@@ -2394,17 +2695,7 @@ private fun DuplicateFinderCard(
         }
     }
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                shape = RoundedCornerShape(16.dp)
-            )
-    ) {
+    SettingsCard {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

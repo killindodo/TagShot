@@ -42,6 +42,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,6 +55,9 @@ import androidx.compose.ui.res.painterResource
 import com.tagshot.app.R
 import com.tagshot.app.ui.components.bouncyClickable
 import com.tagshot.app.ui.components.glassBorder
+import com.tagshot.app.ui.theme.LocalUiDesignSystem
+import com.tagshot.app.ui.theme.UiDesignSystem
+import com.tagshot.app.ui.theme.retroBevel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Label
@@ -716,15 +720,28 @@ private fun GlassActionPillButton(
     hapticsEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val designSystem = LocalUiDesignSystem.current
+    val isDark = isSystemInDarkTheme()
     val primaryColor = MaterialTheme.colorScheme.primary
-    val shape = RoundedCornerShape(13.dp)
-    val activeBg = primaryColor.copy(alpha = 0.18f)
-    val defaultBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
-    val activeBorder = primaryColor.copy(alpha = 0.45f)
-    val defaultBorder = Color.White.copy(alpha = 0.16f)
+    val shape = designSystem.buttonShape
 
-    Box(
-        modifier = modifier
+    val buttonModifier = if (designSystem == UiDesignSystem.RETRO_WIN95) {
+        Modifier
+            .size(42.dp)
+            .retroBevel(
+                isSunken = isActive,
+                strokeWidth = 2.dp,
+                highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                fillColor = if (isActive) (if (isDark) Color(0xFF20232A) else Color(0xFFDFDFDF)) else (if (isDark) Color(0xFF2C3038) else Color(0xFFC0C0C0))
+            )
+    } else {
+        val activeBg = primaryColor.copy(alpha = 0.18f)
+        val defaultBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
+        val activeBorder = primaryColor.copy(alpha = 0.45f)
+        val defaultBorder = Color.White.copy(alpha = 0.16f)
+
+        Modifier
             .size(42.dp)
             .clip(shape)
             .background(if (isActive) activeBg else defaultBg)
@@ -738,6 +755,11 @@ private fun GlassActionPillButton(
                 ),
                 shape = shape
             )
+    }
+
+    Box(
+        modifier = modifier
+            .then(buttonModifier)
             .bouncyClickable(
                 scaleDownFactor = 0.88f,
                 hapticsEnabled = hapticsEnabled,
@@ -784,10 +806,24 @@ private fun MainTopBar(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            // Liquid Frosted Glass Capsule Search Widget
-            val searchShape = RoundedCornerShape(21.dp)
-            Box(
-                modifier = Modifier
+            val designSystem = LocalUiDesignSystem.current
+            val isDark = isSystemInDarkTheme()
+            val searchShape = designSystem.searchBarShape
+
+            val searchModifier = if (designSystem == UiDesignSystem.RETRO_WIN95) {
+                Modifier
+                    .weight(1f)
+                    .height(42.dp)
+                    .retroBevel(
+                        isSunken = true,
+                        strokeWidth = 2.dp,
+                        highlightColor = if (isDark) Color(0xFF6B7280) else Color.White,
+                        shadowColor = if (isDark) Color(0xFF14171D) else Color(0xFF404040),
+                        fillColor = if (isDark) Color(0xFF1A1D23) else Color.White
+                    )
+                    .padding(horizontal = 12.dp)
+            } else {
+                Modifier
                     .weight(1f)
                     .height(42.dp)
                     .clip(searchShape)
@@ -798,7 +834,11 @@ private fun MainTopBar(
                         highlightColor = Color.White.copy(alpha = 0.18f),
                         shadowColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
                     )
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 12.dp)
+            }
+
+            Box(
+                modifier = searchModifier,
                 contentAlignment = Alignment.CenterStart
             ) {
                 Row(
@@ -1000,6 +1040,8 @@ private fun TagChipsRow(
     val isAllSelected by remember(selectedIds, untaggedOnly, startDate, endDate) {
         derivedStateOf { selectedIds.isEmpty() && !untaggedOnly && startDate == null && endDate == null }
     }
+    val designSystem = LocalUiDesignSystem.current
+    val chipShape = designSystem.chipShape
 
     LazyRow(
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
@@ -1016,6 +1058,7 @@ private fun TagChipsRow(
                 FilterChip(
                     selected = true,
                     onClick = onOpenDateRange,
+                    shape = chipShape,
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.DateRange,
@@ -1054,6 +1097,7 @@ private fun TagChipsRow(
                     viewModel.onClearFilters()
                     viewModel.clearDateRange()
                 },
+                shape = chipShape,
                 label = { Text("All (${state.totalLibraryCount})") },
                 colors = FilterChipDefaults.filterChipColors()
             )
@@ -1064,6 +1108,7 @@ private fun TagChipsRow(
             FilterChip(
                 selected = untaggedOnly,
                 onClick = { viewModel.onUntaggedToggled() },
+                shape = chipShape,
                 label = { Text("Untagged (${state.untaggedCount})") }
             )
         }
@@ -1077,6 +1122,7 @@ private fun TagChipsRow(
             FilterChip(
                 selected = isSelected,
                 onClick = { viewModel.onTagChipToggled(tag.id) },
+                shape = chipShape,
                 label = { Text("#${tag.name} (${tag.photoCount})") }
             )
         }
@@ -1088,6 +1134,7 @@ private fun TagChipsRow(
                 FilterChip(
                     selected = true,
                     onClick = { viewModel.toggleTagMatchMode() },
+                    shape = chipShape,
                     label = {
                         Text(if (isAllMode) "Match: ALL (AND)" else "Match: ANY (OR)")
                     }
